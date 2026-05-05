@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "400768657836",
+    "project_id": "rifadorada-92112",
+    "storage_bucket": "rifadorada-92112.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:400768657836:android:dd865b0383ca360211b209",
+        "android_client_info": {
+          "package_name": "com.rifadorada.rifa_dorada"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC7s26Uo4GezElsORgMveQg52Qg3F0T1-w"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

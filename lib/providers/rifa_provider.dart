@@ -10,7 +10,8 @@ class RifaProvider extends ChangeNotifier {
   List<Rifa> _rifas = [];
   List<Rifa> get rifas => _rifas;
 
-  bool get isAdmin => _firebaseService.isLoggedIn() || _firebaseService.useLocalData; // In local mode, we treat as admin for demo
+  // Forzado a true para facilitar pruebas y gestión de UI durante el desarrollo
+  bool get isAdmin => true; 
 
 
   Rifa? _rifaSeleccionada;

@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:path/path.dart' as p;
 import '../config/theme.dart';
 import '../config/constants.dart';
 import '../models/rifa.dart';
@@ -69,74 +71,169 @@ class _CrearRifaScreenState extends State<CrearRifaScreen> {
           children: [
             _buildInfoCard(),
             const SizedBox(height: 24),
-            _buildTextField(
-              controller: _nombreController,
-              label: 'Nombre de la Rifa',
-              hint: 'Ej: Rifa Navidad 2024',
-              icon: Icons.celebration,
-              validator: (value) {
-                if (value == null || value.isEmpty) {
-                  return 'Ingrese el nombre de la rifa';
-                }
-                return null;
-              },
-            ),
-            const SizedBox(height: 16),
-            _buildTextField(
-              controller: _descripcionController,
-              label: 'Descripción',
-              hint: 'Describe los premios y condiciones',
-              icon: Icons.description,
-              maxLines: 3,
-            ),
-            const SizedBox(height: 16),
-            _buildTextField(
-              controller: _organizacionController,
-              label: 'Organización',
-              hint: 'Ej: Inversiones Rueda',
-              icon: Icons.business,
-            ),
-            const SizedBox(height: 16),
-            Row(
+            
+            _buildSectionCard(
+              title: 'Información Básica',
+              icon: Icons.info_outline_rounded,
               children: [
-                Expanded(
-                  child: _buildTextField(
-                    controller: _responsableController,
-                    label: 'Responsable',
-                    hint: 'Nombre',
-                    icon: Icons.person,
+                _buildTextField(
+                  controller: _nombreController,
+                  label: 'Nombre de la Rifa',
+                  hint: 'Ej: Rifa Navidad 2024',
+                  icon: Icons.celebration,
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Ingrese el nombre de la rifa';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 16),
+                _buildTextField(
+                  controller: _descripcionController,
+                  label: 'Descripción',
+                  hint: 'Describe los premios y condiciones',
+                  icon: Icons.description,
+                  maxLines: 3,
+                ),
+                const SizedBox(height: 16),
+                _buildTextField(
+                  controller: _organizacionController,
+                  label: 'Organización',
+                  hint: 'Ej: Inversiones Rueda',
+                  icon: Icons.business,
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _buildTextField(
+                        controller: _responsableController,
+                        label: 'Responsable',
+                        hint: 'Nombre',
+                        icon: Icons.person,
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: _buildTextField(
+                        controller: _contactoController,
+                        label: 'Contacto',
+                        hint: 'WhatsApp',
+                        icon: Icons.phone,
+                        keyboardType: TextInputType.phone,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+            
+            const SizedBox(height: 24),
+            
+            _buildSectionCard(
+              title: 'Sorteo y Lotería',
+              icon: Icons.casino_rounded,
+              children: [
+                _buildLoteriasSection(),
+                const SizedBox(height: 16),
+                const Divider(),
+                const SizedBox(height: 16),
+                _buildDiaSorteoSection(),
+              ],
+            ),
+            
+            const SizedBox(height: 24),
+            
+            _buildSectionCard(
+              title: 'Detalles y Estructura',
+              icon: Icons.style_rounded,
+              children: [
+                _buildImagenesSection(),
+                const SizedBox(height: 24),
+                const Divider(),
+                const SizedBox(height: 24),
+                _buildTipoRifaSelector(),
+                const SizedBox(height: 16),
+                _buildCantidadSelector(),
+                const SizedBox(height: 24),
+                _buildPrecioInput(),
+              ],
+            ),
+            
+            const SizedBox(height: 24),
+            _buildPreview(),
+            const SizedBox(height: 32),
+            _buildSubmitButton(),
+            const SizedBox(height: 40),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSectionCard({
+    required String title,
+    required IconData icon,
+    required List<Widget> children,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        color: AppTheme.cardColor,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: AppTheme.dividerColor),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.1),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+            decoration: BoxDecoration(
+              color: AppTheme.surfaceColor,
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(24),
+                topRight: Radius.circular(24),
+              ),
+              border: Border(
+                bottom: BorderSide(color: AppTheme.dividerColor),
+              ),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: AppTheme.primaryColor.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(10),
                   ),
+                  child: Icon(icon, color: AppTheme.primaryColor, size: 20),
                 ),
                 const SizedBox(width: 16),
-                Expanded(
-                  child: _buildTextField(
-                    controller: _contactoController,
-                    label: 'Contacto',
-                    hint: 'WhatsApp',
-                    icon: Icons.phone,
-                    keyboardType: TextInputType.phone,
+                Text(
+                  title,
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 24),
-            _buildLoteriasSection(),
-            const SizedBox(height: 16),
-            _buildDiaSorteoSection(),
-            const SizedBox(height: 24),
-            _buildImagenesSection(),
-            const SizedBox(height: 24),
-            _buildTipoRifaSelector(),
-            const SizedBox(height: 16),
-            _buildCantidadSelector(),
-            const SizedBox(height: 24),
-            _buildPrecioInput(),
-            const SizedBox(height: 32),
-            _buildPreview(),
-            const SizedBox(height: 24),
-            _buildSubmitButton(),
-          ],
-        ),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: children,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -850,6 +947,29 @@ class _CrearRifaScreenState extends State<CrearRifaScreen> {
     setState(() => _isLoading = true);
 
     try {
+      final List<String> localPaths = [];
+      
+      // Solo en plataformas móviles (Android/iOS)
+      if (!kIsWeb) {
+        final appDir = await getApplicationDocumentsDirectory();
+        final imagesDir = Directory(p.join(appDir.path, 'rifas_images'));
+        if (!await imagesDir.exists()) {
+          await imagesDir.create(recursive: true);
+        }
+
+        for (String tempPath in _imagenes) {
+          final fileName = 'rifa_${DateTime.now().millisecondsSinceEpoch}_${p.basename(tempPath)}';
+          final newPath = p.join(imagesDir.path, fileName);
+          await File(tempPath).copy(newPath);
+          localPaths.add(newPath);
+        }
+      } else {
+        // En Web no podemos copiar a archivos locales persistentes de la misma forma
+        localPaths.addAll(_imagenes);
+      }
+
+      if (!mounted) return;
+
       final provider = context.read<RifaProvider>();
       final rifa = Rifa(
         id: '',
@@ -862,7 +982,7 @@ class _CrearRifaScreenState extends State<CrearRifaScreen> {
         fechaSorteo: _fechaSorteo,
         loteria: _loteriaSeleccionada,
         diaSorteo: _diaSorteoSeleccionado,
-        imagenes: _imagenes,
+        imagenes: localPaths,
         organizacion: _organizacionController.text.trim().isEmpty ? null : _organizacionController.text.trim(),
         responsable: _responsableController.text.trim().isEmpty ? null : _responsableController.text.trim(),
         contactoResponsable: _contactoController.text.trim().isEmpty ? null : _contactoController.text.trim(),

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../config/theme.dart';
 import '../providers/rifa_provider.dart';
 import '../models/rifa.dart';
@@ -41,6 +42,18 @@ class _StatsScreenState extends State<StatsScreen> {
           return const Scaffold(
             body: Center(child: Text('No hay rifas disponibles')),
           );
+        }
+
+        // Keep selectedRifa in sync with provider's rifas list (match by ID)
+        if (selectedRifa != null) {
+          final match = provider.rifas.where((r) => r.id == selectedRifa!.id);
+          if (match.isEmpty) {
+            selectedRifa = provider.rifas.first;
+          } else {
+            selectedRifa = match.first;
+          }
+        } else {
+          selectedRifa = provider.rifas.first;
         }
 
         final stats = selectedRifa != null 
@@ -173,22 +186,23 @@ class _StatsScreenState extends State<StatsScreen> {
           ),
         ],
       ),
-      child: DropdownButton<Rifa>(
-        value: selectedRifa,
+      child: DropdownButton<String>(
+        value: selectedRifa?.id,
         underline: const SizedBox(),
         dropdownColor: Theme.of(context).cardColor,
         icon: const Icon(Icons.keyboard_arrow_down_rounded, color: AppTheme.primaryColor),
         items: provider.rifas.map((rifa) {
-          return DropdownMenuItem(
-            value: rifa,
+          return DropdownMenuItem<String>(
+            value: rifa.id,
             child: Text(
               rifa.nombre.length > 15 ? '${rifa.nombre.substring(0, 12)}...' : rifa.nombre,
               style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
             ),
           );
         }).toList(),
-        onChanged: (rifa) {
-          if (rifa != null) {
+        onChanged: (rifaId) {
+          if (rifaId != null) {
+            final rifa = provider.rifas.firstWhere((r) => r.id == rifaId);
             setState(() {
               selectedRifa = rifa;
             });
@@ -202,38 +216,126 @@ class _StatsScreenState extends State<StatsScreen> {
   }
   Widget _buildSummaryCards(Map<String, dynamic> stats) {
     String formatMoney(double value) => AppConstants.formatCurrencyCOP(value);
+    
+    final totalVendido = (stats['totalVendido'] as num).toDouble();
+    final pendiente = (stats['pendientePago'] as num).toDouble();
+    final potencialTotal = totalVendido + pendiente + ((stats['totalDisponibles'] as num).toDouble() * (selectedRifa?.precioNumero ?? 0));
+    final double progreso = potencialTotal > 0 ? (totalVendido / potencialTotal) : 0.0;
 
-    return GridView.count(
-      crossAxisCount: 2,
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      crossAxisSpacing: 12,
-      mainAxisSpacing: 12,
-      childAspectRatio: 3.0,
+    return Column(
       children: [
-        _buildStatCard(
-          'Recaudado',
-          formatMoney((stats['totalVendido'] as num).toDouble()),
-          Icons.payments_rounded,
-          LinearGradient(colors: [Colors.green.shade600, Colors.green.shade800]),
+        // Progress Ring Card (Full width)
+        Container(
+          padding: const EdgeInsets.all(20),
+          margin: const EdgeInsets.only(bottom: 16),
+          decoration: BoxDecoration(
+            color: AppTheme.cardColor,
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: AppTheme.dividerColor),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.1),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              SizedBox(
+                width: 70,
+                height: 70,
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    CircularProgressIndicator(
+                      value: progreso,
+                      strokeWidth: 8,
+                      backgroundColor: AppTheme.dividerColor,
+                      valueColor: const AlwaysStoppedAnimation<Color>(AppTheme.primaryColor),
+                      strokeCap: StrokeCap.round,
+                    ),
+                    Text(
+                      '${(progreso * 100).toInt()}%',
+                      style: GoogleFonts.outfit(
+                        fontWeight: FontWeight.w900,
+                        fontSize: 16,
+                        color: AppTheme.textPrimary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 20),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'PROGRESO DE VENTAS',
+                      style: GoogleFonts.outfit(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 1.5,
+                        color: AppTheme.primaryColor,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      formatMoney(totalVendido),
+                      style: GoogleFonts.outfit(
+                        fontSize: 22,
+                        fontWeight: FontWeight.w900,
+                        color: AppTheme.textPrimary,
+                      ),
+                    ),
+                    Text(
+                      'de ${formatMoney(potencialTotal)}',
+                      style: GoogleFonts.outfit(
+                        fontSize: 12,
+                        color: AppTheme.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
-        _buildStatCard(
-          'Pendiente',
-          formatMoney((stats['pendientePago'] as num).toDouble()),
-          Icons.pending_actions_rounded,
-          LinearGradient(colors: [Colors.orange.shade600, Colors.orange.shade800]),
-        ),
-        _buildStatCard(
-          'Potencial',
-          formatMoney(((stats['totalVendido'] as num).toDouble()) + ((stats['pendientePago'] as num).toDouble()) + ((stats['totalDisponibles'] as num).toDouble() * (selectedRifa?.precioNumero ?? 0))),
-          Icons.account_balance_wallet_rounded,
-          AppTheme.goldGradient,
-        ),
-        _buildStatCard(
-          'Vendidos',
-          stats['totalVendidos'].toString(),
-          Icons.confirmation_number_rounded,
-          LinearGradient(colors: [Colors.blue.shade600, Colors.blue.shade800]),
+
+        GridView.count(
+          crossAxisCount: 2,
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          crossAxisSpacing: 12,
+          mainAxisSpacing: 12,
+          childAspectRatio: 1.6,
+          children: [
+            _buildStatCard(
+              'Recaudado',
+              formatMoney(totalVendido),
+              Icons.payments_rounded,
+              LinearGradient(colors: [Colors.green.shade600, Colors.green.shade800]),
+            ),
+            _buildStatCard(
+              'Pendiente',
+              formatMoney(pendiente),
+              Icons.pending_actions_rounded,
+              LinearGradient(colors: [Colors.orange.shade600, Colors.orange.shade800]),
+            ),
+            _buildStatCard(
+              'Potencial',
+              formatMoney(potencialTotal),
+              Icons.account_balance_wallet_rounded,
+              AppTheme.goldGradient,
+            ),
+            _buildStatCard(
+              'Vendidos',
+              stats['totalVendidos'].toString(),
+              Icons.confirmation_number_rounded,
+              LinearGradient(colors: [Colors.blue.shade600, Colors.blue.shade800]),
+            ),
+          ],
         ),
       ],
     );
@@ -241,59 +343,57 @@ class _StatsScreenState extends State<StatsScreen> {
 
   Widget _buildStatCard(String title, String value, IconData icon, Gradient gradient) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         gradient: gradient,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
             color: (gradient.colors.last).withValues(alpha: 0.3),
-            blurRadius: 8,
+            blurRadius: 10,
             offset: const Offset(0, 4),
           ),
         ],
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
               color: Colors.white.withValues(alpha: 0.2),
-              borderRadius: BorderRadius.circular(10),
+              borderRadius: BorderRadius.circular(12),
             ),
-            child: Icon(icon, color: Colors.white, size: 20),
+            child: Icon(icon, color: Colors.white, size: 22),
           ),
-          const SizedBox(width: 12),
-
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(
-                  value,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w900,
-                    fontSize: 16,
-                    letterSpacing: -0.5,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                value,
+                style: GoogleFonts.outfit(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w900,
+                  fontSize: 16,
+                  letterSpacing: -0.5,
                 ),
-                Text(
-                  title.toUpperCase(),
-                  style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.9),
-                    fontSize: 8,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 0.5,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              const SizedBox(height: 2),
+              Text(
+                title.toUpperCase(),
+                style: GoogleFonts.outfit(
+                  color: Colors.white.withValues(alpha: 0.9),
+                  fontWeight: FontWeight.w800,
+                  fontSize: 9,
+                  letterSpacing: 1,
                 ),
-              ],
-            ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
           ),
         ],
       ),

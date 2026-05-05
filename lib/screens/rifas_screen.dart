@@ -17,22 +17,57 @@ class RifasScreen extends StatelessWidget {
       length: 2,
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('Mis Rifas'),
-          bottom: const TabBar(
-            tabs: [
-              Tab(text: 'Activas'),
-              Tab(text: 'Cerradas'),
-            ],
-            indicatorColor: AppTheme.primaryColor,
-            labelColor: AppTheme.primaryColor,
-            unselectedLabelColor: AppTheme.textSecondary,
+          title: const Text('Mis Rifas', style: TextStyle(fontWeight: FontWeight.bold)),
+          elevation: 0,
+          backgroundColor: AppTheme.backgroundColor,
+          bottom: PreferredSize(
+            preferredSize: const Size.fromHeight(60),
+            child: Container(
+              height: 44,
+              margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              decoration: BoxDecoration(
+                color: AppTheme.surfaceColor,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppTheme.dividerColor),
+              ),
+              child: TabBar(
+                indicatorSize: TabBarIndicatorSize.tab,
+                dividerColor: Colors.transparent,
+                indicator: BoxDecoration(
+                  color: AppTheme.primaryColor.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: AppTheme.primaryColor.withValues(alpha: 0.5)),
+                ),
+                labelColor: AppTheme.primaryColor,
+                unselectedLabelColor: AppTheme.textSecondary,
+                labelStyle: const TextStyle(fontWeight: FontWeight.bold),
+                tabs: const [
+                  Tab(text: 'Activas'),
+                  Tab(text: 'Cerradas'),
+                ],
+              ),
+            ),
           ),
           actions: [
-            IconButton(
-              icon: const Icon(Icons.add),
-              onPressed: () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const CrearRifaScreen()),
+            Container(
+              margin: const EdgeInsets.only(right: 16),
+              decoration: BoxDecoration(
+                color: AppTheme.primaryColor,
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: AppTheme.primaryColor.withValues(alpha: 0.3),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: IconButton(
+                icon: const Icon(Icons.add, color: AppTheme.backgroundColor),
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const CrearRifaScreen()),
+                ),
               ),
             ),
           ],
@@ -60,24 +95,47 @@ class _RifasActivasTab extends StatelessWidget {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(
-                  Icons.celebration,
-                  size: 80,
-                  color: AppTheme.textSecondary.withValues(alpha: 0.5),
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  'No hay rifas activas',
-                  style: Theme.of(context).textTheme.titleLarge,
+                Container(
+                  padding: const EdgeInsets.all(24),
+                  decoration: BoxDecoration(
+                    color: AppTheme.surfaceColor,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: AppTheme.dividerColor),
+                  ),
+                  child: Icon(
+                    Icons.celebration_rounded,
+                    size: 64,
+                    color: AppTheme.primaryColor.withValues(alpha: 0.5),
+                  ),
                 ),
                 const SizedBox(height: 24),
+                Text(
+                  'No hay rifas activas',
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Crea tu primera rifa para empezar',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: AppTheme.textSecondary,
+                  ),
+                ),
+                const SizedBox(height: 32),
                 ElevatedButton.icon(
                   onPressed: () => Navigator.push(
                     context,
                     MaterialPageRoute(builder: (_) => const CrearRifaScreen()),
                   ),
-                  icon: const Icon(Icons.add),
+                  icon: const Icon(Icons.add_circle_outline),
                   label: const Text('Crear Nueva Rifa'),
+                  style: ElevatedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                  ),
                 ),
               ],
             ),
@@ -89,24 +147,37 @@ class _RifasActivasTab extends StatelessWidget {
           itemCount: rifasActivas.length,
           itemBuilder: (context, index) {
             final rifa = rifasActivas[index];
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 16),
-              child: RifaCard(
-                rifa: rifa,
-                showDetails: true,
-                onEdit: provider.isAdmin ? () => _showEditDialog(context, rifa, provider) : null,
-                onDelete: provider.isAdmin ? () => _confirmDeleteRifa(context, rifa, provider) : null,
-                onTap: () {
-                  provider.setRifaSeleccionada(rifa);
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => const _RifaDetalleScreen(),
-                    ),
-                  );
-                },
+            return TweenAnimationBuilder<double>(
+              tween: Tween(begin: 0.0, end: 1.0),
+              duration: Duration(milliseconds: 400 + (index * 100)),
+              curve: Curves.easeOutCubic,
+              builder: (context, value, child) {
+                return Transform.translate(
+                  offset: Offset(0, 50 * (1 - value)),
+                  child: Opacity(
+                    opacity: value,
+                    child: child,
+                  ),
+                );
+              },
+              child: Padding(
+                padding: const EdgeInsets.only(bottom: 16),
+                child: RifaCard(
+                  rifa: rifa,
+                  showDetails: true,
+                  onEdit: provider.isAdmin ? () => _showEditDialog(context, rifa, provider) : null,
+                  onDelete: provider.isAdmin ? () => _confirmDeleteRifa(context, rifa, provider) : null,
+                  onTap: () {
+                    provider.setRifaSeleccionada(rifa);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const _RifaDetalleScreen(),
+                      ),
+                    );
+                  },
+                ),
               ),
-
             );
           },
         );
@@ -248,15 +319,32 @@ class _RifasCerradasTab extends StatelessWidget {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(
-                  Icons.event_busy,
-                  size: 80,
-                  color: AppTheme.textSecondary.withValues(alpha: 0.5),
+                Container(
+                  padding: const EdgeInsets.all(24),
+                  decoration: BoxDecoration(
+                    color: AppTheme.surfaceColor,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: AppTheme.dividerColor),
+                  ),
+                  child: Icon(
+                    Icons.event_busy_rounded,
+                    size: 64,
+                    color: AppTheme.textSecondary.withValues(alpha: 0.5),
+                  ),
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 24),
                 Text(
                   'No hay rifas cerradas',
-                  style: Theme.of(context).textTheme.titleLarge,
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Tus rifas finalizadas aparecerán aquí',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: AppTheme.textSecondary,
+                  ),
                 ),
               ],
             ),
@@ -268,12 +356,26 @@ class _RifasCerradasTab extends StatelessWidget {
           itemCount: rifasCerradas.length,
           itemBuilder: (context, index) {
             final rifa = rifasCerradas[index];
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 16),
-              child: RifaCard(
-                rifa: rifa,
-                showDetails: true,
-                onTap: () {},
+            return TweenAnimationBuilder<double>(
+              tween: Tween(begin: 0.0, end: 1.0),
+              duration: Duration(milliseconds: 400 + (index * 100)),
+              curve: Curves.easeOutCubic,
+              builder: (context, value, child) {
+                return Transform.translate(
+                  offset: Offset(0, 50 * (1 - value)),
+                  child: Opacity(
+                    opacity: value,
+                    child: child,
+                  ),
+                );
+              },
+              child: Padding(
+                padding: const EdgeInsets.only(bottom: 16),
+                child: RifaCard(
+                  rifa: rifa,
+                  showDetails: true,
+                  onTap: () {},
+                ),
               ),
             );
           },

@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -8,6 +7,7 @@ import 'providers/theme_provider.dart';
 import 'providers/rifa_provider.dart';
 import 'services/firebase_service.dart';
 import 'app.dart';
+import 'firebase_options.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -26,20 +26,15 @@ void main() async {
   ]);
 
   try {
-    if (kIsWeb) {
-      // En la web, Firebase requiere opciones explícitas. 
-      // Si no están, FirebaseService manejará el modo local.
-      debugPrint('Web detected: checking for Firebase options...');
-    } else {
-      await Firebase.initializeApp();
-    }
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
   } catch (e) {
     debugPrint('Firebase initialization error: $e');
   }
 
 
   await FirebaseService.instance.initialize();
-
   runApp(
     MultiProvider(
       providers: [
