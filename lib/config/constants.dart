@@ -1,3 +1,6 @@
+import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
 class AppConstants {
   static const String appName = 'RifaDorada';
   static const String appVersion = '1.0.0';
@@ -6,7 +9,34 @@ class AppConstants {
   static const String currencyCode = 'COP';
   static const String countryCode = '+57';
   static const String timezone = 'America/Bogota';
-  
+
+  static const String _defaultChatbotUrl = 'http://10.231.66.151:3008';
+  static const String _chatbotUrlKey = 'chatbot_url';
+
+  static String _chatbotUrl = _defaultChatbotUrl;
+
+  static String get chatbotUrl => _chatbotUrl;
+  static String get chatbotApi => '$_chatbotUrl/v1';
+
+  static Future<void> loadChatbotUrl() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      _chatbotUrl = prefs.getString(_chatbotUrlKey) ?? _defaultChatbotUrl;
+    } catch (e) {
+      _chatbotUrl = _defaultChatbotUrl;
+    }
+  }
+
+  static Future<void> setChatbotUrl(String url) async {
+    final cleanUrl = url.endsWith('/') ? url.substring(0, url.length - 1) : url;
+    _chatbotUrl = cleanUrl;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_chatbotUrlKey, cleanUrl);
+    } catch (e) {
+      debugPrint('Error saving chatbot URL: $e');
+    }
+  }
   static const int maxNumeros100 = 100;
   static const int maxNumeros1000 = 1000;
   

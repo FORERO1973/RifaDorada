@@ -405,7 +405,7 @@ class _RifaCardState extends State<RifaCard> with SingleTickerProviderStateMixin
             if (widget.rifa.diaSorteo != null)
               _buildTag(
                 icon: Icons.calendar_today_rounded,
-                text: widget.rifa.fechaSorteo != null 
+                text: widget.rifa.fechaSorteo != null
                     ? '${widget.rifa.diaSorteo} ${DateFormat('dd MMM', 'es').format(widget.rifa.fechaSorteo!)}'
                     : widget.rifa.diaSorteo!,
               ),

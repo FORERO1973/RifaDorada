@@ -1,7 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_contacts/flutter_contacts.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -331,7 +330,6 @@ class _RegistroParticipanteScreenState
     final provider = context.read<RifaProvider>();
     final rifa = provider.rifaSeleccionada;
     final numerosSeleccionados = provider.numerosSeleccionados.toList();
-    final totalSeleccion = provider.totalSeleccion;
 
     try {
       final id = await provider.registrarParticipante(
@@ -344,19 +342,6 @@ class _RegistroParticipanteScreenState
       );
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('¡Registro exitoso!'),
-            backgroundColor: AppTheme.secondaryColor,
-          ),
-        );
-
-        final message = AppConstants.generateWhatsAppMessage(
-          nombre: _nombreController.text.trim(),
-          numeros: numerosSeleccionados,
-          total: totalSeleccion,
-          nombreRifa: rifa?.nombre ?? '',
-        );
         final participante = Participante(
           id: id,
           rifaId: rifa?.id ?? '',
@@ -370,7 +355,25 @@ class _RegistroParticipanteScreenState
           totalPagado: 0,
         );
 
-        _showWhatsAppDialog(message, _whatsappController.text.trim(), participante, rifa!);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('✅ Registro exitoso. Generando ticket...'),
+            backgroundColor: AppTheme.secondaryColor,
+            duration: Duration(seconds: 1),
+          ),
+        );
+
+        Navigator.pop(context);
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => TicketScreen(
+              participante: participante,
+              rifa: rifa!,
+              autoSend: true,
+            ),
+          ),
+        );
       }
     } catch (e) {
       if (mounted) {
@@ -384,67 +387,4 @@ class _RegistroParticipanteScreenState
     }
   }
 
-  void _showWhatsAppDialog(String message, String whatsapp, Participante participante, Rifa rifa) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Registro Completado'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('¿Desea enviar la confirmación por WhatsApp?'),
-            const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: AppTheme.surfaceColor,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text(message, style: const TextStyle(fontSize: 12)),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              Navigator.pop(context);
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => TicketScreen(participante: participante, rifa: rifa),
-                ),
-              );
-            },
-            child: const Text('VER TICKET'),
-          ),
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              Navigator.pop(context);
-              Navigator.pop(context);
-            },
-            child: const Text('Más tarde'),
-          ),
-          ElevatedButton.icon(
-            onPressed: () async {
-              final phone = AppConstants.formatPhoneNumber(whatsapp);
-              final url = Uri.parse('https://wa.me/$phone?text=${Uri.encodeComponent(message)}');
-              if (await canLaunchUrl(url)) {
-                await launchUrl(url);
-              }
-              if (context.mounted) {
-                Navigator.pop(context);
-                Navigator.pop(context);
-                Navigator.pop(context);
-              }
-            },
-            icon: const Icon(Icons.send),
-            label: const Text('Enviar'),
-          ),
-        ],
-      ),
-    );
-  }
 }

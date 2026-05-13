@@ -6,24 +6,14 @@ import 'package:intl/date_symbol_data_local.dart';
 import 'providers/theme_provider.dart';
 import 'providers/rifa_provider.dart';
 import 'services/firebase_service.dart';
+import 'config/constants.dart';
 import 'app.dart';
 import 'firebase_options.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await initializeDateFormatting('es', null);
-
-  SystemChrome.setSystemUIOverlayStyle(
-    const SystemUiOverlayStyle(
-      statusBarColor: Colors.transparent,
-      statusBarIconBrightness: Brightness.light,
-    ),
-  );
-
-  await SystemChrome.setPreferredOrientations([
-    DeviceOrientation.portraitUp,
-    DeviceOrientation.portraitDown,
-  ]);
+  await AppConstants.loadChatbotUrl();
 
   try {
     await Firebase.initializeApp(
@@ -32,7 +22,6 @@ void main() async {
   } catch (e) {
     debugPrint('Firebase initialization error: $e');
   }
-
 
   await FirebaseService.instance.initialize();
   runApp(

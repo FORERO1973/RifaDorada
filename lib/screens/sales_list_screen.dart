@@ -74,6 +74,8 @@ class _SalesListScreenState extends State<SalesListScreen> {
                       _filterStatus == 'Todos' ||
                       (_filterStatus == 'Pagados' &&
                           p.estadoPago == EstadoPago.pagado) ||
+                      (_filterStatus == 'Abonados' &&
+                          p.estadoPago == EstadoPago.abonado) ||
                       (_filterStatus == 'Pendientes' &&
                           p.estadoPago == EstadoPago.pendiente);
 
@@ -127,20 +129,22 @@ class _SalesListScreenState extends State<SalesListScreen> {
             ),
             onChanged: (value) => setState(() => _searchQuery = value),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 8),
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             child: Row(
-              children: ['Todos', 'Pagados', 'Pendientes'].map((filter) {
+              children: ['Todos', 'Pagados', 'Abonados', 'Pendientes'].map((filter) {
                 final isSelected = _filterStatus == filter;
                 return Padding(
-                  padding: const EdgeInsets.only(right: 8),
+                  padding: const EdgeInsets.only(right: 6),
                   child: FilterChip(
-                    label: Text(filter),
+                    label: Text(filter, style: const TextStyle(fontSize: 11)),
                     selected: isSelected,
                     onSelected: (val) => setState(() => _filterStatus = filter),
                     selectedColor: AppTheme.primaryColor.withValues(alpha: 0.2),
                     checkmarkColor: AppTheme.primaryColor,
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                    visualDensity: VisualDensity.compact,
                   ),
                 );
               }).toList(),
@@ -153,9 +157,25 @@ class _SalesListScreenState extends State<SalesListScreen> {
 
   Widget _buildParticipanteCard(Participante p, RifaProvider provider) {
     final isPaid = p.estadoPago == EstadoPago.pagado;
+    final isAbonado = p.estadoPago == EstadoPago.abonado || (p.totalPagado > 0 && !isPaid);
+    final precioTotal = p.numeros.length * widget.rifa.precioNumero;
+    
+    Color estadoColor;
+    String estadoLabel;
+    if (isPaid) {
+      estadoColor = AppTheme.secondaryColor;
+      estadoLabel = 'PAGADO';
+    } else if (isAbonado) {
+      estadoColor = Colors.orange;
+      estadoLabel = 'ABONADO';
+    } else {
+      estadoColor = AppTheme.errorColor;
+      estadoLabel = 'PENDIENTE';
+    }
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -188,17 +208,13 @@ class _SalesListScreenState extends State<SalesListScreen> {
                     vertical: 4,
                   ),
                   decoration: BoxDecoration(
-                    color: isPaid
-                        ? AppTheme.secondaryColor.withValues(alpha: 0.2)
-                        : AppTheme.errorColor.withValues(alpha: 0.2),
+                    color: estadoColor.withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Text(
-                    isPaid ? 'PAGADO' : 'PENDIENTE',
+                    estadoLabel,
                     style: TextStyle(
-                      color: isPaid
-                          ? AppTheme.secondaryColor
-                          : AppTheme.errorColor,
+                      color: estadoColor,
                       fontSize: 10,
                       fontWeight: FontWeight.bold,
                     ),
@@ -241,6 +257,15 @@ class _SalesListScreenState extends State<SalesListScreen> {
                   )
                   .toList(),
             ),
+            if (p.totalPagado > 0) ...[
+              const SizedBox(height: 8),
+              Text(
+                isPaid 
+                  ? 'Pagado: ${AppConstants.formatCurrencyCOP(p.totalPagado)}'
+                  : 'Abonado: ${AppConstants.formatCurrencyCOP(p.totalPagado)} - Saldo: ${AppConstants.formatCurrencyCOP(precioTotal - p.totalPagado)}',
+                style: TextStyle(color: estadoColor, fontWeight: FontWeight.bold, fontSize: 12),
+              ),
+            ],
             if (p.notas != null && p.notas!.isNotEmpty) ...[
               const SizedBox(height: 12),
               Container(
@@ -267,12 +292,21 @@ class _SalesListScreenState extends State<SalesListScreen> {
                   icon: Icons.delete_outline,
                   color: AppTheme.errorColor,
                   onTap: () => _confirmDelete(p, provider),
+                  label: 'Eliminar',
                 ),
                 const SizedBox(width: 8),
                 _buildActionButton(
                   icon: Icons.message_outlined,
                   color: Colors.green,
                   onTap: () => _contactWhatsApp(p),
+                  label: 'WhatsApp',
+                ),
+                const SizedBox(width: 8),
+                _buildActionButton(
+                  icon: Icons.add_circle_outline,
+                  color: Colors.orange,
+                  onTap: () => _showAbonoDialog(context, p, provider),
+                  label: 'Abonar',
                 ),
                 const SizedBox(width: 8),
                 _buildActionButton(
@@ -285,29 +319,60 @@ class _SalesListScreenState extends State<SalesListScreen> {
                           TicketScreen(participante: p, rifa: widget.rifa),
                     ),
                   ),
+                  label: 'Ticket',
                 ),
                 const SizedBox(width: 8),
-                if (!isPaid)
-                  ElevatedButton.icon(
-                    onPressed: () => provider.marcarPago(p.id, true),
-                    icon: const Icon(Icons.check_circle_outline, size: 18),
-                    label: const Text('MARCAR PAGO'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppTheme.secondaryColor,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                    ),
-                  )
-                else
-                  OutlinedButton.icon(
-                    onPressed: () => provider.marcarPago(p.id, false),
-                    icon: const Icon(Icons.history, size: 18),
-                    label: const Text('REVERTIR'),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: AppTheme.textSecondary,
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                    ),
-                  ),
+                Expanded(
+                  child: !isPaid
+                      ? ElevatedButton.icon(
+                          onPressed: () => _confirmAction(
+                            context,
+                            title: 'Confirmar Pago',
+                            message: '¿Estás seguro de marcar como PAGADO a ${p.nombre}?',
+                            onConfirm: () => provider.marcarPago(p.id, true),
+                          ),
+                          icon: const Icon(Icons.check_circle_outline, size: 16),
+                          label: const Text(
+                            'PAGAR',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppTheme.secondaryColor,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(horizontal: 8),
+                            minimumSize: const Size(0, 40),
+                          ),
+                        )
+                      : OutlinedButton.icon(
+                          onPressed: () => _confirmAction(
+                            context,
+                            title: 'Revertir Pago',
+                            message: '¿Estás seguro de REVERTIR el pago de ${p.nombre}?',
+                            onConfirm: () => provider.marcarPago(p.id, false),
+                          ),
+                          icon: const Icon(Icons.history, size: 16),
+                          label: const Text(
+                            'REVERTIR',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: AppTheme.textSecondary,
+                            padding: const EdgeInsets.symmetric(horizontal: 8),
+                            side: BorderSide(color: AppTheme.dividerColor),
+                            minimumSize: const Size(0, 40),
+                          ),
+                        ),
+                ),
               ],
             ),
           ],
@@ -316,21 +381,59 @@ class _SalesListScreenState extends State<SalesListScreen> {
     );
   }
 
+  void _confirmAction(
+    BuildContext context, {
+    required String title,
+    required String message,
+    required VoidCallback onConfirm,
+  }) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(title),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('CANCELAR'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              onConfirm();
+              Navigator.pop(context);
+            },
+            child: const Text('CONFIRMAR'),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildActionButton({
     required IconData icon,
     required Color color,
     required VoidCallback onTap,
+    String? label,
   }) {
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(12),
       child: Container(
-        padding: const EdgeInsets.all(10),
+        padding: const EdgeInsets.all(8),
         decoration: BoxDecoration(
           border: Border.all(color: color.withValues(alpha: 0.3)),
           borderRadius: BorderRadius.circular(12),
         ),
-        child: Icon(icon, color: color, size: 20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, color: color, size: 16),
+            if (label != null) ...[
+              const SizedBox(height: 2),
+              Text(label, style: TextStyle(fontSize: 8, color: color, fontWeight: FontWeight.w500)),
+            ],
+          ],
+        ),
       ),
     );
   }
@@ -398,6 +501,137 @@ class _SalesListScreenState extends State<SalesListScreen> {
             },
             child: const Text('ELIMINAR'),
           ),
+        ],
+      ),
+    );
+  }
+
+  void _showAbonoDialog(BuildContext context, Participante p, RifaProvider provider) {
+    final montoController = TextEditingController();
+    final notaController = TextEditingController();
+    String metodoPago = 'efectivo';
+
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) {
+          final precioTotal = p.numeros.length * widget.rifa.precioNumero;
+          final faltante = precioTotal - p.totalPagado;
+
+          return AlertDialog(
+            title: Column(
+              children: [
+                const Text('Registrar Abono'),
+                Text(
+                  '${p.nombre}',
+                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.normal),
+                ),
+              ],
+            ),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: AppTheme.surfaceColor,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Column(
+                      children: [
+                        _buildInfoRow('Total rifa', AppConstants.formatCurrencyCOP(precioTotal)),
+                        _buildInfoRow('Abonado', AppConstants.formatCurrencyCOP(p.totalPagado)),
+                        _buildInfoRow('Saldo', AppConstants.formatCurrencyCOP(faltante), color: AppTheme.errorColor),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: montoController,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(
+                      labelText: 'Monto',
+                      prefixText: '\$ ',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  DropdownButtonFormField<String>(
+                    value: metodoPago,
+                    decoration: const InputDecoration(
+                      labelText: 'Método de pago',
+                      border: OutlineInputBorder(),
+                    ),
+                    items: ['efectivo', 'transferencia', 'datáfono', 'bizum', 'otro']
+                        .map((e) => DropdownMenuItem(value: e, child: Text(e.toString())))
+                        .toList(),
+                    onChanged: (v) => setState(() => metodoPago = v!),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: notaController,
+                    maxLines: 2,
+                    decoration: const InputDecoration(
+                      labelText: 'Nota (opcional)',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Wrap(
+                    spacing: 8,
+                    children: [10000, 20000, 50000, faltante.toInt()]
+                        .where((m) => m > 0)
+                        .map((monto) => ActionChip(
+                              label: Text(AppConstants.formatCurrencyCOP(monto.toDouble())),
+                              onPressed: () => montoController.text = monto.toString(),
+                            ))
+                        .toList(),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('CANCELAR'),
+              ),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.orange),
+                onPressed: () {
+                  final monto = double.tryParse(montoController.text);
+                  if (monto == null || monto <= 0) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Ingrese un monto válido')),
+                    );
+                    return;
+                  }
+                  provider.registrarAbono(
+                    participanteId: p.id,
+                    monto: monto,
+                    nota: notaController.text.isNotEmpty ? notaController.text : null,
+                    metodoPago: metodoPago,
+                  );
+                  Navigator.pop(context);
+                },
+                child: const Text('REGISTRAR ABONO'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildInfoRow(String label, String value, {Color? color}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label, style: const TextStyle(fontSize: 12)),
+          Text(value, style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: color)),
         ],
       ),
     );

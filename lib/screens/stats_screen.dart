@@ -25,11 +25,13 @@ class _StatsScreenState extends State<StatsScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final provider = Provider.of<RifaProvider>(context, listen: false);
       if (provider.rifas.isNotEmpty) {
+        final primeraRifa = provider.rifas.first;
         setState(() {
-          selectedRifa = provider.rifas.first;
+          selectedRifa = primeraRifa;
         });
-        provider.loadParticipantes(selectedRifa!.id);
-        provider.loadNumeros(selectedRifa!.id);
+        provider.setRifaSeleccionada(primeraRifa);
+        provider.loadParticipantes(primeraRifa.id);
+        provider.loadNumeros(primeraRifa.id);
       }
     });
   }
@@ -81,7 +83,7 @@ class _StatsScreenState extends State<StatsScreen> {
                         const SizedBox(height: 24),
                         _buildRevenueChart(stats),
                         const SizedBox(height: 24),
-                        _buildTrendChart(provider.participantes),
+                        _buildTrendChart(provider),
                         const SizedBox(height: 100), // Space for bottom bar
                       ],
                     ),
@@ -214,14 +216,17 @@ class _StatsScreenState extends State<StatsScreen> {
       ),
     );
   }
-  Widget _buildSummaryCards(Map<String, dynamic> stats) {
+Widget _buildSummaryCards(Map<String, dynamic> stats) {
     String formatMoney(double value) => AppConstants.formatCurrencyCOP(value);
     
-    final totalVendido = (stats['totalVendido'] as num).toDouble();
-    final pendiente = (stats['pendientePago'] as num).toDouble();
-    final potencialTotal = totalVendido + pendiente + ((stats['totalDisponibles'] as num).toDouble() * (selectedRifa?.precioNumero ?? 0));
-    final double progreso = potencialTotal > 0 ? (totalVendido / potencialTotal) : 0.0;
-
+    final totalPagado = (stats['totalVendido'] as num?)?.toDouble() ?? 0.0;
+    final pendiente = (stats['pendientePago'] as num?)?.toDouble() ?? 0.0;
+    final int numerosVendidos = stats['totalVendidos'] as int? ?? 0;
+    final int totalNumeros = selectedRifa?.cantidadNumeros ?? 1;
+    final double progreso = totalNumeros > 0 ? (numerosVendidos / totalNumeros) : 0.0;
+    final double potencialTotal = totalNumeros * (selectedRifa?.precioNumero ?? 0);
+    final double totalVendido = totalPagado + pendiente;
+    
     return Column(
       children: [
         // Progress Ring Card (Full width)
@@ -313,7 +318,7 @@ class _StatsScreenState extends State<StatsScreen> {
           children: [
             _buildStatCard(
               'Recaudado',
-              formatMoney(totalVendido),
+              formatMoney(totalPagado),
               Icons.payments_rounded,
               LinearGradient(colors: [Colors.green.shade600, Colors.green.shade800]),
             ),
@@ -331,7 +336,7 @@ class _StatsScreenState extends State<StatsScreen> {
             ),
             _buildStatCard(
               'Vendidos',
-              stats['totalVendidos'].toString(),
+              '${stats['totalVendidos'] ?? 0}',
               Icons.confirmation_number_rounded,
               LinearGradient(colors: [Colors.blue.shade600, Colors.blue.shade800]),
             ),
@@ -402,40 +407,83 @@ class _StatsScreenState extends State<StatsScreen> {
 
 
   Widget _buildSalesChart(Map<String, dynamic> stats) {
-    final vendidos = stats['totalVendidos'] as int;
-    final disponibles = stats['totalDisponibles'] as int;
-    final total = vendidos + disponibles;
-    final porcentaje = total > 0 ? (vendidos / total * 100).toStringAsFixed(1) : '0';
+    final int totalNumeros = selectedRifa?.cantidadNumeros ?? 1;
+    final int vendidos = stats['totalVendidos'] as int? ?? 0;
+    final int pagadosCount = stats['numerosPagados'] as int? ?? 0;
+    final int reservadosCount = stats['numerosReservados'] as int? ?? 0;
+    final int disponiblesCount = totalNumeros - vendidos;
+    final porcentaje = totalNumeros > 0 ? (vendidos / totalNumeros * 100).toStringAsFixed(1) : '0';
 
     return _buildChartContainer(
       title: 'Distribución de Números',
       subtitle: '$porcentaje% de la rifa vendida',
-      child: SizedBox(
-        height: 200,
-        child: PieChart(
-          PieChartData(
-            sectionsSpace: 4,
-            centerSpaceRadius: 40,
-            sections: [
-              PieChartSectionData(
-                color: AppTheme.primaryColor,
-                value: vendidos.toDouble(),
-                title: '$vendidos',
-                radius: 50,
-                titleStyle: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
+      child: Column(
+        children: [
+          SizedBox(
+            height: 200,
+            child: PieChart(
+              PieChartData(
+                sectionsSpace: 2,
+                centerSpaceRadius: 40,
+                sections: [
+                  PieChartSectionData(
+                    color: Colors.green.shade600,
+                    value: pagadosCount.toDouble(),
+                    title: '$pagadosCount',
+                    radius: 50,
+                    titleStyle: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
+                  ),
+                  PieChartSectionData(
+                    color: Colors.orange.shade600,
+                    value: reservadosCount.toDouble(),
+                    title: '$reservadosCount',
+                    radius: 50,
+                    titleStyle: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
+                  ),
+                  PieChartSectionData(
+                    color: AppTheme.primaryColor.withValues(alpha: 0.2),
+                    value: disponiblesCount.toDouble(),
+                    title: '$disponiblesCount',
+                    radius: 40,
+                    titleStyle: const TextStyle(color: AppTheme.primaryColor, fontWeight: FontWeight.bold, fontSize: 10),
+                  ),
+                ],
               ),
-              PieChartSectionData(
-                color: AppTheme.primaryColor.withValues(alpha: 0.2),
-                value: disponibles.toDouble(),
-                title: '$disponibles',
-                radius: 40,
-                titleStyle: const TextStyle(color: AppTheme.primaryColor, fontWeight: FontWeight.bold, fontSize: 10),
-              ),
-
+            ),
+          ),
+          const SizedBox(height: 16),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              _buildLegendItem('Pagados', Colors.green.shade600),
+              const SizedBox(width: 16),
+              _buildLegendItem('Reservados', Colors.orange.shade600),
+              const SizedBox(width: 16),
+              _buildLegendItem('Disponibles', AppTheme.primaryColor.withValues(alpha: 0.2)),
             ],
           ),
-        ),
+        ],
       ),
+    );
+  }
+
+  Widget _buildLegendItem(String label, Color color) {
+    return Row(
+      children: [
+        Container(
+          width: 12,
+          height: 12,
+          decoration: BoxDecoration(
+            color: color,
+            borderRadius: BorderRadius.circular(3),
+          ),
+        ),
+        const SizedBox(width: 4),
+        Text(
+          label,
+          style: TextStyle(fontSize: 11, color: AppTheme.textSecondary),
+        ),
+      ],
     );
   }
 
@@ -448,14 +496,14 @@ class _StatsScreenState extends State<StatsScreen> {
         child: BarChart(
           BarChartData(
             alignment: BarChartAlignment.spaceAround,
-            maxY: (stats['totalVendido'] + stats['pendientePago']).toDouble(),
+            maxY: (stats['totalVendido'] ?? 0) + (stats['pendientePago'] ?? 0),
             barTouchData: BarTouchData(
               enabled: true,
               touchTooltipData: BarTouchTooltipData(
                 getTooltipColor: (_) => Colors.black87,
                 getTooltipItem: (group, groupIndex, rod, rodIndex) {
                   return BarTooltipItem(
-                    AppConstants.formatCurrencyCOP(rod.toY),
+                    AppConstants.formatCurrencyCOP((rod.toY as num).toDouble()),
                     const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
                   );
                 },
@@ -483,7 +531,7 @@ class _StatsScreenState extends State<StatsScreen> {
                 x: 0,
                 barRods: [
                   BarChartRodData(
-                    toY: stats['totalVendido'].toDouble(),
+                    toY: (stats['totalVendido'] as num?)?.toDouble() ?? 0.0,
                     color: Colors.green,
                     width: 30,
                     borderRadius: const BorderRadius.vertical(top: Radius.circular(6)),
@@ -494,7 +542,7 @@ class _StatsScreenState extends State<StatsScreen> {
                 x: 1,
                 barRods: [
                   BarChartRodData(
-                    toY: stats['pendientePago'].toDouble(),
+                    toY: (stats['pendientePago'] as num?)?.toDouble() ?? 0.0,
                     color: Colors.orange,
                     width: 30,
                     borderRadius: const BorderRadius.vertical(top: Radius.circular(6)),
@@ -508,20 +556,42 @@ class _StatsScreenState extends State<StatsScreen> {
     );
   }
 
-  Widget _buildTrendChart(List<Participante> participantes) {
-    // Group sales by day for the last 7 days
+  Widget _buildTrendChart(RifaProvider provider) {
+    if (provider.participantes.isEmpty) {
+      return _buildChartContainer(
+        title: 'Tendencia de Ventas',
+        subtitle: 'Números vendidos en los últimos 7 días',
+        child: SizedBox(
+          height: 200,
+          child: Center(
+            child: Text(
+              'No hay ventas registradas',
+              style: TextStyle(color: AppTheme.textSecondary),
+            ),
+          ),
+        ),
+      );
+    }
+
     final now = DateTime.now();
     final Map<int, int> salesByDay = {};
     
     for (int i = 0; i < 7; i++) {
       final day = now.subtract(Duration(days: i));
-      salesByDay[DateTime(day.year, day.month, day.day).millisecondsSinceEpoch] = 0;
+      final key = DateTime(day.year, day.month, day.day).millisecondsSinceEpoch;
+      salesByDay[key] = 0;
     }
 
-    for (final p in participantes) {
-      final pDate = DateTime(p.fechaRegistro.year, p.fechaRegistro.month, p.fechaRegistro.day).millisecondsSinceEpoch;
-      if (salesByDay.containsKey(pDate)) {
-        salesByDay[pDate] = (salesByDay[pDate] ?? 0) + p.numeros.length;
+    for (final p in provider.participantes) {
+      final pDate = DateTime(p.fechaRegistro.year, p.fechaRegistro.month, p.fechaRegistro.day);
+      final existingKey = salesByDay.keys.firstWhere(
+        (k) => DateTime.fromMillisecondsSinceEpoch(k).day == pDate.day &&
+               DateTime.fromMillisecondsSinceEpoch(k).month == pDate.month &&
+               DateTime.fromMillisecondsSinceEpoch(k).year == pDate.year,
+        orElse: () => 0,
+      );
+      if (existingKey != 0) {
+        salesByDay[existingKey] = (salesByDay[existingKey] ?? 0) + p.numeros.length;
       }
     }
 
@@ -536,50 +606,57 @@ class _StatsScreenState extends State<StatsScreen> {
       subtitle: 'Números vendidos en los últimos 7 días',
       child: SizedBox(
         height: 200,
-        child: LineChart(
-          LineChartData(
-            gridData: const FlGridData(show: false),
-            titlesData: FlTitlesData(
-              show: true,
-              bottomTitles: AxisTitles(
-                sideTitles: SideTitles(
-                  showTitles: true,
-                  getTitlesWidget: (value, meta) {
-                    if (value.toInt() >= sortedKeys.length) return const SizedBox();
-                    final date = DateTime.fromMillisecondsSinceEpoch(sortedKeys[value.toInt()]);
-                    return Text(DateFormat('dd').format(date), style: const TextStyle(fontSize: 10));
-                  },
+        child: spots.isEmpty
+            ? Center(
+                child: Text(
+                  'No hay datos de ventas',
+                  style: TextStyle(color: AppTheme.textSecondary),
                 ),
-              ),
-              leftTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-              topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-              rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-            ),
-            borderData: FlBorderData(show: false),
-            lineBarsData: [
-              LineChartBarData(
-                spots: spots,
-                isCurved: true,
-                gradient: AppTheme.goldGradient,
-                barWidth: 4,
-                isStrokeCapRound: true,
-                dotData: const FlDotData(show: false),
-                belowBarData: BarAreaData(
-                  show: true,
-                  gradient: LinearGradient(
-                    colors: [
-                      AppTheme.primaryColor.withValues(alpha: 0.2),
-                      AppTheme.primaryColor.withValues(alpha: 0.0),
+              )
+            : LineChart(
+                  LineChartData(
+                    gridData: const FlGridData(show: false),
+                    titlesData: FlTitlesData(
+                      show: true,
+                      bottomTitles: AxisTitles(
+                        sideTitles: SideTitles(
+                          showTitles: true,
+                          getTitlesWidget: (value, meta) {
+                            if (value.toInt() >= sortedKeys.length) return const SizedBox();
+                            final date = DateTime.fromMillisecondsSinceEpoch(sortedKeys[value.toInt()]);
+                            return Text(DateFormat('dd').format(date), style: const TextStyle(fontSize: 10));
+                          },
+                        ),
+                      ),
+                      leftTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                      topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                      rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                    ),
+                    borderData: FlBorderData(show: false),
+                    lineBarsData: [
+                      LineChartBarData(
+                        spots: spots,
+                        isCurved: true,
+                        gradient: AppTheme.goldGradient,
+                        barWidth: 4,
+                        isStrokeCapRound: true,
+                        dotData: const FlDotData(show: false),
+                        belowBarData: BarAreaData(
+                          show: true,
+                          gradient: LinearGradient(
+                            colors: [
+                              AppTheme.primaryColor.withValues(alpha: 0.2),
+                              AppTheme.primaryColor.withValues(alpha: 0.0),
+                            ],
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                          ),
+                        ),
+                      ),
                     ],
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
                   ),
                 ),
-              ),
-            ],
-          ),
-        ),
-      ),
+),
     );
   }
 
@@ -622,17 +699,17 @@ class _StatsScreenState extends State<StatsScreen> {
     double pendientePago = 0;
     int totalVendidosCount = 0;
     int totalDisponiblesCount = 0;
-    int participantesPagados = 0;
-    int participantesPendientes = 0;
+    int numerosPagados = 0;
+    int numerosReservados = 0;
 
     for (final rifa in provider.rifas) {
       final stats = provider.getEstadisticasForRifa(rifa.id, rifa.precioNumero);
-      totalVendido += stats['totalVendido'];
-      pendientePago += stats['pendientePago'];
-      totalVendidosCount += stats['totalVendidos'] as int;
-      totalDisponiblesCount += stats['totalDisponibles'] as int;
-      participantesPagados += stats['participantesPagados'] as int;
-      participantesPendientes += stats['participantesPendientes'] as int;
+      totalVendido += (stats['totalVendido'] as num?)?.toDouble() ?? 0.0;
+      pendientePago += (stats['pendientePago'] as num?)?.toDouble() ?? 0.0;
+      totalVendidosCount += stats['totalVendidos'] as int? ?? 0;
+      totalDisponiblesCount += stats['totalDisponibles'] as int? ?? 0;
+      numerosPagados += stats['numerosPagados'] as int? ?? 0;
+      numerosReservados += stats['numerosReservados'] as int? ?? 0;
     }
     
     return {
@@ -640,8 +717,8 @@ class _StatsScreenState extends State<StatsScreen> {
       'pendientePago': pendientePago,
       'totalVendidos': totalVendidosCount,
       'totalDisponibles': totalDisponiblesCount,
-      'participantesPagados': participantesPagados,
-      'participantesPendientes': participantesPendientes,
+      'numerosPagados': numerosPagados,
+      'numerosReservados': numerosReservados,
     };
   }
 

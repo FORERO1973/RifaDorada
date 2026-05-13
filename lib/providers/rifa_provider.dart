@@ -1,4 +1,9 @@
+import 'dart:io';
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:intl/intl.dart';
 import '../models/rifa.dart';
 import '../models/participante.dart';
 import '../models/numero.dart';
@@ -129,11 +134,10 @@ class RifaProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      _firebaseService.getParticipantes(rifaId).listen((participantes) {
-        _participantes = participantes;
-        _isLoading = false;
-        notifyListeners();
-      });
+      final participantes = await _firebaseService.getParticipantesOnce(rifaId);
+      _participantes = participantes;
+      _isLoading = false;
+      notifyListeners();
     } catch (e) {
       _error = e.toString();
       _isLoading = false;
@@ -226,6 +230,7 @@ class RifaProvider extends ChangeNotifier {
         estadoPago: EstadoPago.pendiente,
         fechaRegistro: DateTime.now(),
         totalPagado: 0,
+        botNotified: false, // Iniciar en false para que el bot lo detecte
       );
 
       final id = await _firebaseService.registrarParticipante(participante);
@@ -248,21 +253,110 @@ class RifaProvider extends ChangeNotifier {
     }
   }
 
+  Future<void> registrarAbono({
+    required String participanteId,
+    required double monto,
+    String? nota,
+    String metodoPago = 'efectivo',
+  }) async {
+    if (_rifaSeleccionada == null) return;
+
+    try {
+      final participante = _participantes.firstWhere(
+        (p) => p.id == participanteId,
+      );
+
+      final abonoId = DateTime.now().millisecondsSinceEpoch.toString();
+      final abono = Abono(
+        id: abonoId,
+        fecha: DateTime.now(),
+        monto: monto,
+        nota: nota,
+        metodoPago: metodoPago,
+      );
+
+      final historialId = DateTime.now().millisecondsSinceEpoch.toString();
+      final historial = HistorialCambio(
+        id: historialId,
+        fecha: DateTime.now(),
+        tipo: 'abono',
+        descripcion: 'Abono registrado: \$${monto.toStringAsFixed(0)}',
+        valorAnterior: participante.totalPagado,
+        valorNuevo: participante.totalPagado + monto,
+      );
+
+      final nuevosAbonos = [...participante.abonos, abono];
+      final nuevoHistorial = [...participante.historial, historial];
+      final nuevoTotalPagado = participante.totalPagado + monto;
+      final precioTotal = participante.numeros.length * _rifaSeleccionada!.precioNumero;
+
+      EstadoPago nuevoEstado;
+      if (nuevoTotalPagado >= precioTotal) {
+        nuevoEstado = EstadoPago.pagado;
+      } else if (nuevoTotalPagado > 0) {
+        nuevoEstado = EstadoPago.abonado;
+      } else {
+        nuevoEstado = EstadoPago.pendiente;
+      }
+
+      final nuevoParticipante = participante.copyWith(
+        abonos: nuevosAbonos,
+        historial: nuevoHistorial,
+        totalPagado: nuevoTotalPagado,
+        estadoPago: nuevoEstado,
+      );
+
+      await _firebaseService.actualizarParticipante(nuevoParticipante);
+
+      await _firebaseService.notificarAbonoAlChatbot(
+        _rifaSeleccionada!.id,
+        participante.whatsappFormateado,
+        monto,
+        metodoPago,
+      );
+
+      if (nuevoEstado == EstadoPago.pagado && participante.estadoPago != EstadoPago.pagado) {
+        for (final num in participante.numeros) {
+          final numeroObj = _numeros[num]?.copyWith(estado: EstadoNumero.pagado);
+          if (numeroObj != null) {
+            await _firebaseService.actualizarNumero(_rifaSeleccionada!.id, num, numeroObj);
+          }
+        }
+      }
+
+      await loadParticipantes(_rifaSeleccionada!.id);
+      await loadNumeros(_rifaSeleccionada!.id);
+    } catch (e) {
+      _error = e.toString();
+      notifyListeners();
+    }
+  }
+
   Future<void> marcarPago(String participanteId, bool pagado) async {
     try {
       final participante = _participantes.firstWhere(
         (p) => p.id == participanteId,
       );
+
+      final historialId = DateTime.now().millisecondsSinceEpoch.toString();
+      final historial = HistorialCambio(
+        id: historialId,
+        fecha: DateTime.now(),
+        tipo: 'estado',
+        descripcion:pagado ? 'Marcado como PAGADO' : 'Marcado como PENDIENTE',
+        valorAnterior: participante.estadoPago.name,
+        valorNuevo: pagado ? 'pagado' : 'pendiente',
+      );
+
+      final precioTotal = participante.numeros.length * _rifaSeleccionada!.precioNumero;
       final nuevoParticipante = participante.copyWith(
         estadoPago: pagado ? EstadoPago.pagado : EstadoPago.pendiente,
-        totalPagado: pagado
-            ? (participante.numeros.length * _rifaSeleccionada!.precioNumero)
-            : 0,
+        totalPagado: pagado ? precioTotal : 0,
+        historial: [...participante.historial, historial],
       );
 
       await _firebaseService.actualizarParticipante(nuevoParticipante);
       
-      // Actualizar estado de los números
       for (final num in participante.numeros) {
         final numeroObj = _numeros[num]?.copyWith(
           estado: pagado ? EstadoNumero.pagado : EstadoNumero.reservado,
@@ -297,7 +391,7 @@ class RifaProvider extends ChangeNotifier {
     }
   }
 
-  Map<String, dynamic> getEstadisticas() {
+Map<String, dynamic> getEstadisticas() {
     if (_rifaSeleccionada == null) {
       return {
         'totalVendidos': 0,
@@ -309,31 +403,22 @@ class RifaProvider extends ChangeNotifier {
       };
     }
 
-    final vendidos = _numeros.values.where((n) => n.estaOcupado).length;
-    final disponibles = _numeros.values.where((n) => n.estaDisponible).length;
+    final vendidos = _numeros.values.where((n) => n.estaOcupado || n.estaPagado || n.estaReservado).length;
+    // Cálculo corregido basado en la cantidad total de la rifa
+    final disponibles = _rifaSeleccionada!.cantidadNumeros - vendidos;
+    final pagadosCount = _numeros.values.where((n) => n.estaPagado).length;
+    final reservadosCount = _numeros.values.where((n) => n.estaReservado).length;
     
-    double totalVendido = 0;
-    double pendientePago = 0;
-    int pagadosCount = 0;
-    int pendientesCount = 0;
-
-    for (var p in _participantes) {
-      if (p.estaPagado) {
-        totalVendido += p.totalPagado;
-        pagadosCount++;
-      } else {
-        pendientePago += (p.numeros.length * _rifaSeleccionada!.precioNumero);
-        pendientesCount++;
-      }
-    }
+    final totalVendido = pagadosCount * _rifaSeleccionada!.precioNumero;
+    final pendientePago = reservadosCount * _rifaSeleccionada!.precioNumero;
 
     return {
       'totalVendidos': vendidos,
       'totalDisponibles': disponibles,
       'totalVendido': totalVendido,
       'pendientePago': pendientePago,
-      'participantesPagados': pagadosCount,
-      'participantesPendientes': pendientesCount,
+      'numerosPagados': pagadosCount,
+      'numerosReservados': reservadosCount,
     };
   }
 
@@ -348,12 +433,42 @@ class RifaProvider extends ChangeNotifier {
   }
 
 
-  Future<String> exportarDatosCSV() async {
-    if (_rifaSeleccionada == null) return '';
+  Future<void> exportarDatosCSV() async {
+    if (_rifaSeleccionada == null) return;
 
-    return await _firebaseService.exportarDatosCSV(
-      _rifaSeleccionada!.id,
-      _rifaSeleccionada!.nombre,
-    );
+    try {
+      _isLoading = true;
+      notifyListeners();
+
+      final csvContent = await _firebaseService.exportarDatosCSV(
+        _rifaSeleccionada!.id,
+        _rifaSeleccionada!.nombre,
+      );
+
+      if (csvContent.isEmpty) {
+        _error = 'No hay participantes registrados en esta rifa para exportar.';
+        return;
+      }
+
+      final directory = await getTemporaryDirectory();
+      // Nombre de archivo más profesional con fecha
+      final dateStr = DateFormat('yyyyMMdd_HHmm').format(DateTime.now());
+      final fileName = 'Reporte_${_rifaSeleccionada!.nombre.replaceAll(' ', '_')}_$dateStr.csv';
+      final filePath = '${directory.path}/$fileName';
+      
+      final file = File(filePath);
+      await file.writeAsString(csvContent, encoding: utf8);
+
+      await Share.shareXFiles(
+        [XFile(filePath, mimeType: 'text/csv')],
+        subject: 'Reporte de Rifa: ${_rifaSeleccionada!.nombre}',
+      );
+    } catch (e) {
+      _error = 'Error crítico al exportar: $e';
+      debugPrint(_error);
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
   }
 }

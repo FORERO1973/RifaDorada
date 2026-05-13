@@ -1,9 +1,13 @@
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:intl/intl.dart';
+import 'package:http/http.dart' as http;
 import '../models/rifa.dart';
 import '../models/participante.dart';
 import '../models/numero.dart';
+import '../config/constants.dart';
 
 class FirebaseService {
   static FirebaseService? _instance;
@@ -176,6 +180,7 @@ class FirebaseService {
     }
     
     await _firestore!.collection('rifas').doc(id).set(rifa.toMap());
+    _syncRifasToChatbot();
     return id;
   }
 
@@ -189,6 +194,7 @@ class FirebaseService {
     }
     
     await _firestore!.collection('rifas').doc(rifa.id).update(rifa.toMap());
+    _syncRifasToChatbot();
   }
 
   Future<void> eliminarRifa(String id) async {
@@ -200,6 +206,7 @@ class FirebaseService {
     }
     
     await _firestore!.collection('rifas').doc(id).delete();
+    _syncRifasToChatbot();
   }
 
   Stream<List<Participante>> getParticipantes(String rifaId) {
@@ -209,11 +216,27 @@ class FirebaseService {
     
     return _firestore!.collection('participantes')
         .where('rifaId', isEqualTo: rifaId)
-        .orderBy('fechaRegistro', descending: true)
         .snapshots()
         .map((snapshot) => snapshot.docs
             .map((doc) => Participante.fromMap(doc.data(), doc.id))
             .toList());
+  }
+
+  Future<List<Participante>> getParticipantesOnce(String rifaId) async {
+    if (_useLocalData) {
+      return _localParticipantes[rifaId] ?? [];
+    }
+    
+    final snapshot = await _firestore!.collection('participantes')
+        .where('rifaId', isEqualTo: rifaId)
+        .get();
+    
+    final results = snapshot.docs
+        .map((doc) => Participante.fromMap(doc.data(), doc.id))
+        .toList();
+    
+    results.sort((a, b) => b.fechaRegistro.compareTo(a.fechaRegistro));
+    return results;
   }
 
   Future<String> registrarParticipante(Participante participante) async {
@@ -241,6 +264,10 @@ class FirebaseService {
     }
     
     await _firestore!.collection('participantes').doc(id).set(participante.toMap());
+    _syncParticipantesToChatbot(participante.rifaId);
+    final rifa = await getRifa(participante.rifaId);
+    final total = rifa != null ? rifa.precioNumero * participante.numeros.length : 0.0;
+    _notifySaleToChatbot(participante.rifaId, participante.numeros, participante, total);
     return id;
   }
 
@@ -259,6 +286,7 @@ class FirebaseService {
     await _firestore!.collection('participantes')
         .doc(participante.id)
         .update(participante.toMap());
+    _syncParticipantesToChatbot(participante.rifaId);
   }
 
   Future<void> eliminarParticipante(String id, String rifaId, List<String> numeros) async {
@@ -380,7 +408,7 @@ class FirebaseService {
       final participantes = _localParticipantes[rifaId] ?? [];
       final numerosMap = _localNumeros[rifaId] ?? {};
       
-      final vendidos = numerosMap.values.where((n) => n.estaOcupado).length;
+      final vendidos = numerosMap.values.where((n) => n.estaOcupado || n.estaPagado).length;
       final disponibles = numerosMap.values.where((n) => n.estaDisponible).length;
       final totalVendido = participantes
           .where((p) => p.estaPagado)
@@ -410,21 +438,255 @@ class FirebaseService {
   }
 
   Future<String> exportarDatosCSV(String rifaId, String nombreRifa) async {
+    List<Participante> participantes;
     if (_useLocalData) {
-      final participantes = _localParticipantes[rifaId] ?? [];
-      final buffer = StringBuffer();
+      participantes = _localParticipantes[rifaId] ?? [];
+    } else {
+      final snapshot = await _firestore!
+          .collection('participantes')
+          .where('rifaId', isEqualTo: rifaId)
+          .get();
+      participantes = snapshot.docs
+          .map((doc) => Participante.fromMap(doc.data(), doc.id))
+          .toList();
+    }
+
+    if (participantes.isEmpty) return '';
+
+    final buffer = StringBuffer();
+    // Añadir BOM para que Excel reconozca caracteres especiales (tildes, ñ) en español
+    buffer.write('\uFEFF');
+    // Encabezados con nombres profesionales
+    buffer.writeln('Nombre,WhatsApp,Ciudad,Documento,Números,Estado de Pago,Total,Fecha de Registro');
+    
+    for (final p in participantes) {
+      final estado = p.estadoPago == EstadoPago.pagado ? 'Pagado' : 'Pendiente';
+      final fecha = DateFormat('dd/MM/yyyy HH:mm').format(p.fechaRegistro);
       
-      buffer.writeln('Nombre,Whatsapp,Ciudad,Documento,Numeros,EstadoPago,Total,Fecha');
-      
-      for (final p in participantes) {
-        buffer.writeln(
-          '"${p.nombre}","${p.whatsapp}","${p.ciudad}","${p.documento ?? ''}","${p.numerosString}","${p.estadoPago == EstadoPago.pagado ? 'Pagado' : 'Pendiente'}","${p.totalPagado}","${p.fechaRegistro.toIso8601String()}"'
-        );
-      }
-      
-      return buffer.toString();
+      buffer.writeln(
+        '"${p.nombre}","${p.whatsapp}","${p.ciudad}","${p.documento ?? ''}","${p.numerosString}","$estado","${p.totalPagado}","$fecha"'
+      );
     }
     
-    return '';
+    return buffer.toString();
+  }
+
+  Future<void> _syncRifasToChatbot() async {
+    if (_useLocalData) return;
+    try {
+      final rifas = await _firestore!.collection('rifas')
+          .where('activa', isEqualTo: true)
+          .get();
+      final rifasData = rifas.docs.map((doc) {
+        final data = doc.data();
+        return {
+          'id': doc.id,
+          'name': data['nombre'] ?? '',
+          'description': data['descripcion'] ?? '',
+          'ticketPrice': (data['precioNumero'] ?? 0).toDouble(),
+          'totalTickets': data['cantidadNumeros'] ?? 0,
+          'deadline': data['fechaSorteo'] != null 
+              ? data['fechaSorteo'] 
+              : null,
+          'active': data['activa'] ?? true,
+          'soldTickets': <int>[],
+        };
+      }).toList();
+
+      await http.post(
+        Uri.parse('${AppConstants.chatbotApi}/sync/rifas'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'rifas': rifasData}),
+      );
+      debugPrint('[SYNC] Rifas enviadas al chatbot');
+    } catch (e) {
+      debugPrint('[SYNC] Error enviando rifas al chatbot: $e');
+    }
+  }
+
+  Future<void> _syncParticipantesToChatbot(String rifaId) async {
+    if (_useLocalData) return;
+    try {
+      final snapshot = await _firestore!.collection('participantes')
+          .where('rifaId', isEqualTo: rifaId)
+          .get();
+      final participantesData = snapshot.docs.map((doc) {
+        final data = doc.data();
+        return {
+          'id': doc.id,
+          'rifaId': data['rifaId'] ?? '',
+          'nombre': data['nombre'] ?? '',
+          'whatsapp': data['whatsapp'] ?? '',
+          'ciudad': data['ciudad'] ?? '',
+          'numeros': List<String>.from(data['numeros'] ?? []),
+          'estadoPago': data['estadoPago'] ?? 'pendiente',
+          'totalPagado': (data['totalPagado'] ?? 0).toDouble(),
+          'fechaRegistro': data['fechaRegistro'] ?? DateTime.now().toIso8601String(),
+        };
+      }).toList();
+
+      await http.post(
+        Uri.parse('${AppConstants.chatbotApi}/sync/participantes'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'participantes': participantesData}),
+      );
+      debugPrint('[SYNC] Participantes de rifa $rifaId enviados al chatbot');
+    } catch (e) {
+      debugPrint('[SYNC] Error enviando participantes al chatbot: $e');
+    }
+  }
+
+  Future<void> _notifySaleToChatbot(String rifaId, List<String> numeros, Participante participante, double total) async {
+    try {
+      final estadoPago = participante.estadoPago == EstadoPago.pagado ? 'pagado' : 'pendiente';
+      final faltante = total - participante.totalPagado;
+      final fecha = DateFormat('dd/MM/yyyy HH:mm').format(DateTime.now());
+      
+      final mensajeTicket = '''
+╔═══════════════════════════════════════╗
+║       🎫 RIFADORADA - TICKET 🎫       ║
+╚═══════════════════════════════════════╝
+
+🏆 *RIFA:* ${rifaId}
+📅 *Fecha:* $fecha
+
+─────────────────── DATOS ───────────────────
+
+👤 *Cliente:* ${participante.nombre}
+📍 *Ciudad:* ${participante.ciudad}
+📱 *Teléfono:* ${participante.whatsappFormateado}
+
+────────────────── TUS NÚMEROS ─────────────────
+
+       🎯 ${numeros.join('  •  ')} 🎯
+
+────────────────── PAGO ────────────────────────
+
+💰 *Total:* \$${total.toStringAsFixed(0)} COP
+💵 *Pagado:* \$${participante.totalPagado.toStringAsFixed(0)} COP
+⏳ *Faltante:* \$${faltante.toStringAsFixed(0)} COP
+
+📊 *Estado:* ${estadoPago == 'pagado' ? '✅ PAGADO' : '⏳ PENDIENTE'}
+
+───────────────────────────────────────────────
+
+📌 *INSTRUCCIONES DE PAGO*
+
+1️⃣ Realiza la consignación al número de cuenta
+2️⃣ Envía el comprobante por este chat
+3️⃣ ¡Listo! Ya participas en el suerte
+
+📞 *¿Dudas?* Escribe y te ayudamos
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+         🍀 ¡MUCHA SUERTE! 🍀
+     esperamos que ganes el premio
+''';
+
+      await http.post(
+        Uri.parse('${AppConstants.chatbotApi}/send/wa'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'number': participante.whatsappFormateado,
+          'message': mensajeTicket,
+        }),
+      );
+      debugPrint('[SYNC] Ticket enviado al cliente por WhatsApp');
+    } catch (e) {
+      debugPrint('[SYNC] Error enviando ticket al chatbot: $e');
+    }
+  }
+
+  Future<bool> enviarTicketConImagen(String whatsapp, String message, String? imageBase64) async {
+    try {
+      final response = await http.post(
+        Uri.parse('${AppConstants.chatbotApi}/messages'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'number': whatsapp,
+          'message': message,
+          'imageBase64': imageBase64,
+        }),
+      );
+      if (response.statusCode == 200) {
+        debugPrint('[SYNC] Ticket con imagen enviado al cliente');
+        return true;
+      }
+      debugPrint('[SYNC] Error: chatbot respondió ${response.statusCode}');
+      return false;
+    } catch (e) {
+      debugPrint('[SYNC] Error enviando ticket con imagen: $e');
+      return false;
+    }
+  }
+
+  Future<void> _notifyAbonoToChatbot(String rifaId, String whatsapp, double monto, String metodoPago) async {
+    try {
+      await http.post(
+        Uri.parse('${AppConstants.chatbotApi}/sync/abono'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'whatsapp': whatsapp,
+          'rifaId': rifaId,
+          'monto': monto,
+          'metodoPago': metodoPago,
+        }),
+      );
+      debugPrint('[SYNC] Abono notificado al chatbot');
+    } catch (e) {
+      debugPrint('[SYNC] Error notificando abono al chatbot: $e');
+    }
+  }
+
+  Future<void> syncAllToChatbot() async {
+    await _syncRifasToChatbot();
+    if (_useLocalData) {
+      for (final rifa in _localRifas) {
+        await _syncParticipantesToChatbot(rifa.id);
+      }
+    } else {
+      final rifaDocs = await _firestore!.collection('rifas').get();
+      for (final doc in rifaDocs.docs) {
+        await _syncParticipantesToChatbot(doc.id);
+      }
+    }
+  }
+
+  Future<void> notificarAbonoAlChatbot(String rifaId, String whatsapp, double monto, String metodoPago) async {
+    await _notifyAbonoToChatbot(rifaId, whatsapp, monto, metodoPago);
+    await _syncParticipantesToChatbot(rifaId);
+  }
+
+  Future<void> reenviarTicket(String rifaId, String whatsapp) async {
+    try {
+      await http.post(
+        Uri.parse('${AppConstants.chatbotApi}/send/ticket'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'whatsapp': whatsapp,
+          'rifaId': rifaId,
+        }),
+      );
+      debugPrint('[SYNC] Ticket reenviado al chatbot');
+    } catch (e) {
+      debugPrint('[SYNC] Error reenviando ticket al chatbot: $e');
+    }
+  }
+
+  Future<void> enviarMensajePersonalizado(String whatsapp, String mensaje) async {
+    try {
+      await http.post(
+        Uri.parse('${AppConstants.chatbotApi}/send/custom'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'whatsapp': whatsapp,
+          'message': mensaje,
+        }),
+      );
+      debugPrint('[SYNC] Mensaje personalizado enviado');
+    } catch (e) {
+      debugPrint('[SYNC] Error enviando mensaje personalizado: $e');
+    }
   }
 }
