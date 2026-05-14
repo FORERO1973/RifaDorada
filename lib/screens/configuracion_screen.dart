@@ -113,7 +113,10 @@ class _ConfiguracionScreenState extends State<ConfiguracionScreen> {
     try {
       final url = _chatbotUrlController.text.trim();
       final cleanUrl = url.endsWith('/') ? url.substring(0, url.length - 1) : url;
-      final response = await http.get(Uri.parse('$cleanUrl/v1/rifas'))
+      final testUri = '$cleanUrl/v1/rifas';
+      debugPrint('[CONFIG] Probando conexión a: $testUri');
+
+      final response = await http.get(Uri.parse(testUri))
           .timeout(const Duration(seconds: 5));
 
       if (response.statusCode == 200) {
@@ -128,9 +131,10 @@ class _ConfiguracionScreenState extends State<ConfiguracionScreen> {
         });
       }
     } catch (e) {
+      debugPrint('[CONFIG] Error de conexión: $e');
       setState(() {
         _connectionSuccess = false;
-        _connectionStatus = '❌ No se pudo conectar: ${e.toString().substring(0, e.toString().length > 80 ? 80 : e.toString().length)}';
+        _connectionStatus = '❌ $e';
       });
     } finally {
       setState(() => _isTesting = false);
