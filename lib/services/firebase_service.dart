@@ -543,47 +543,35 @@ class FirebaseService {
       final faltante = total - participante.totalPagado;
       final fecha = DateFormat('dd/MM/yyyy HH:mm').format(DateTime.now());
       
-      final mensajeTicket = '''
-╔═══════════════════════════════════════╗
-║       🎫 RIFADORADA - TICKET 🎫       ║
-╚═══════════════════════════════════════╝
-
-🏆 *RIFA:* ${rifaId}
-📅 *Fecha:* $fecha
-
-─────────────────── DATOS ───────────────────
-
-👤 *Cliente:* ${participante.nombre}
-📍 *Ciudad:* ${participante.ciudad}
-📱 *Teléfono:* ${participante.whatsappFormateado}
-
-────────────────── TUS NÚMEROS ─────────────────
-
-       🎯 ${numeros.join('  •  ')} 🎯
-
-────────────────── PAGO ────────────────────────
-
-💰 *Total:* \$${total.toStringAsFixed(0)} COP
-💵 *Pagado:* \$${participante.totalPagado.toStringAsFixed(0)} COP
-⏳ *Faltante:* \$${faltante.toStringAsFixed(0)} COP
-
-📊 *Estado:* ${estadoPago == 'pagado' ? '✅ PAGADO' : '⏳ PENDIENTE'}
-
-───────────────────────────────────────────────
-
-📌 *INSTRUCCIONES DE PAGO*
-
-1️⃣ Realiza la consignación al número de cuenta
-2️⃣ Envía el comprobante por este chat
-3️⃣ ¡Listo! Ya participas en el suerte
-
-📞 *¿Dudas?* Escribe y te ayudamos
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-         🍀 ¡MUCHA SUERTE! 🍀
-     esperamos que ganes el premio
-''';
+      final estadoIcono = estadoPago == 'pagado' ? '✅' : '⏳';
+      final estadoTexto = estadoPago == 'pagado' ? 'PAGADO' : 'PENDIENTE';
+      final mensajeTicket = [
+        '🎫 *RIFADORADA — TICKET*',
+        '━━━━━━━━━━━━━━━━━━━━━━━',
+        '🏆 *Rifa:* ${participante.rifaId}',
+        '📅 ${fecha}',
+        '',
+        '👤 *${participante.nombre}*',
+        '📱 ${participante.whatsappFormateado}',
+        '📍 ${participante.ciudad}',
+        '',
+        '🎯 *Números:* ${numeros.join(', ')}',
+        '',
+        '━━ 💰 PAGO ━━',
+        '*Total:* \$${total.toStringAsFixed(0)} COP',
+        '*Pagado:* \$${participante.totalPagado.toStringAsFixed(0)} COP',
+        if (faltante > 0) '*Faltante:* \$${faltante.toStringAsFixed(0)} COP',
+        '*Estado:* ${estadoIcono} ${estadoTexto}',
+        '',
+        '━━ 📌 ━━',
+        '1. Consigna al número de cuenta',
+        '2. Envía el comprobante por este chat',
+        '3. ¡Listo! Ya participas',
+        '',
+        '📞 _¿Dudas? Escribe y te ayudamos_',
+        '',
+        '🍀 *¡Mucha suerte!*',
+      ].join('\n');
 
       await http.post(
         Uri.parse('${AppConstants.chatbotApi}/send/wa'),
