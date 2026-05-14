@@ -369,24 +369,63 @@ class RifaProvider extends ChangeNotifier {
       );
 
       final pNumero = precioNumero ?? _rifaSeleccionada?.precioNumero ?? 0;
+      final precioTotal = participante.numeros.length * pNumero;
+      final saldoRestante = precioTotal.toDouble() - participante.totalPagado;
       final historialId = DateTime.now().millisecondsSinceEpoch.toString();
       final historial = HistorialCambio(
         id: historialId,
         fecha: DateTime.now(),
         tipo: 'estado',
-        descripcion:pagado ? 'Marcado como PAGADO' : 'Marcado como PENDIENTE',
+        descripcion: pagado ? 'Marcado como PAGADO' : 'Marcado como PENDIENTE',
         valorAnterior: participante.estadoPago.name,
         valorNuevo: pagado ? 'pagado' : 'pendiente',
       );
 
-      final precioTotal = participante.numeros.length * pNumero;
+      List<Abono> nuevosAbonos;
+      double nuevoTotalPagado;
+
+      if (pagado && saldoRestante > 0) {
+        final abonoCierre = Abono(
+          id: 'cierre-${DateTime.now().millisecondsSinceEpoch}',
+          fecha: DateTime.now(),
+          monto: saldoRestante,
+          nota: 'Cierre de cuenta',
+          metodoPago: 'efectivo',
+        );
+        nuevosAbonos = [...participante.abonos, abonoCierre];
+        nuevoTotalPagado = precioTotal.toDouble();
+      } else {
+        nuevosAbonos = participante.abonos;
+        nuevoTotalPagado = pagado ? precioTotal.toDouble() : 0;
+      }
+
       final nuevoParticipante = participante.copyWith(
+        abonos: nuevosAbonos,
         estadoPago: pagado ? EstadoPago.pagado : EstadoPago.pendiente,
-        totalPagado: pagado ? precioTotal : 0,
+        totalPagado: nuevoTotalPagado,
         historial: [...participante.historial, historial],
       );
 
       await _firebaseService.actualizarParticipante(nuevoParticipante);
+
+      if (pagado && saldoRestante > 0) {
+        final abonosMap = nuevosAbonos.map((a) => {
+          'fecha': a.fecha.toIso8601String(),
+          'monto': a.monto,
+          'metodoPago': a.metodoPago,
+        }).toList();
+        await _firebaseService.notificarAbonoAlChatbot(
+          rifaId: rid,
+          whatsapp: participante.whatsappFormateado,
+          monto: saldoRestante,
+          metodoPago: 'efectivo',
+          nombre: participante.nombre,
+          numeros: participante.numeros,
+          total: precioTotal.toDouble(),
+          totalPagado: precioTotal.toDouble(),
+          abonos: abonosMap,
+        );
+      }
       
       for (final num in participante.numeros) {
         final numeroObj = _numeros[num]?.copyWith(
