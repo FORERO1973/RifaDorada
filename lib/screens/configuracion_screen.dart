@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import '../config/theme.dart';
 import '../config/constants.dart';
 import '../providers/theme_provider.dart';
+import '../models/app_config.dart';
 import '../services/firebase_service.dart';
 import 'login_screen.dart';
 
@@ -21,16 +22,85 @@ class _ConfiguracionScreenState extends State<ConfiguracionScreen> {
   String? _connectionStatus;
   bool? _connectionSuccess;
 
+  final _orgController = TextEditingController();
+  final _respController = TextEditingController();
+  final _telController = TextEditingController();
+  final _emailController = TextEditingController();
+  final _cuentaController = TextEditingController();
+  String _metodoPago = 'nequi';
+  bool _isSavingConfig = false;
+  bool _isLoadingConfig = true;
+
   @override
   void initState() {
     super.initState();
     _chatbotUrlController.text = AppConstants.chatbotUrl;
+    _loadAppConfig();
   }
 
   @override
   void dispose() {
     _chatbotUrlController.dispose();
+    _orgController.dispose();
+    _respController.dispose();
+    _telController.dispose();
+    _emailController.dispose();
+    _cuentaController.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadAppConfig() async {
+    try {
+      final config = await FirebaseService.instance.getAppConfig();
+      if (config != null && mounted) {
+        setState(() {
+          _orgController.text = config.organizacion;
+          _respController.text = config.responsable;
+          _telController.text = config.telefono;
+          _emailController.text = config.email;
+          _cuentaController.text = config.numeroCuenta;
+          _metodoPago = config.metodoPago;
+        });
+      }
+    } catch (e) {
+      debugPrint('[CONFIG] Error loading app config: $e');
+    } finally {
+      if (mounted) setState(() => _isLoadingConfig = false);
+    }
+  }
+
+  Future<void> _saveAppConfig() async {
+    setState(() => _isSavingConfig = true);
+    try {
+      final config = AppConfig(
+        organizacion: _orgController.text.trim(),
+        responsable: _respController.text.trim(),
+        telefono: _telController.text.trim(),
+        email: _emailController.text.trim(),
+        numeroCuenta: _cuentaController.text.trim(),
+        metodoPago: _metodoPago,
+      );
+      await FirebaseService.instance.updateAppConfig(config);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('✅ Datos guardados correctamente'),
+            backgroundColor: AppTheme.secondaryColor,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('⚠️ Error al guardar: $e'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isSavingConfig = false);
+    }
   }
 
   Future<void> _testChatbotConnection() async {
@@ -103,6 +173,9 @@ class _ConfiguracionScreenState extends State<ConfiguracionScreen> {
                   const SizedBox(height: 28),
                   _buildSectionTitle(context, 'Chatbot WhatsApp', Icons.smart_toy_rounded),
                   _buildChatbotSection(context),
+                  const SizedBox(height: 28),
+                  _buildSectionTitle(context, 'Datos del Usuario', Icons.business_rounded),
+                  _buildUserDataSection(context),
                   const SizedBox(height: 28),
                   _buildSectionTitle(context, 'Región', Icons.public_rounded),
                   _buildRegionInfo(context),
@@ -331,6 +404,161 @@ class _ConfiguracionScreenState extends State<ConfiguracionScreen> {
             ),
           ],
         ],
+      ),
+    );
+  }
+
+  Widget _buildUserDataSection(BuildContext context) {
+    if (_isLoadingConfig) {
+      return Container(
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          color: AppTheme.cardColor,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: AppTheme.dividerColor),
+        ),
+        child: const Center(child: CircularProgressIndicator()),
+      );
+    }
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppTheme.cardColor,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppTheme.dividerColor),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          TextField(
+            controller: _orgController,
+            style: GoogleFonts.outfit(fontWeight: FontWeight.w600, fontSize: 14),
+            decoration: const InputDecoration(
+              labelText: 'Organización',
+              prefixIcon: Icon(Icons.business, size: 20),
+            ),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _respController,
+            style: GoogleFonts.outfit(fontWeight: FontWeight.w600, fontSize: 14),
+            decoration: const InputDecoration(
+              labelText: 'Responsable',
+              prefixIcon: Icon(Icons.person, size: 20),
+            ),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _telController,
+            style: GoogleFonts.outfit(fontWeight: FontWeight.w600, fontSize: 14),
+            keyboardType: TextInputType.phone,
+            decoration: const InputDecoration(
+              labelText: 'Teléfono',
+              prefixIcon: Icon(Icons.phone, size: 20),
+            ),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _emailController,
+            style: GoogleFonts.outfit(fontWeight: FontWeight.w600, fontSize: 14),
+            keyboardType: TextInputType.emailAddress,
+            decoration: const InputDecoration(
+              labelText: 'Email',
+              prefixIcon: Icon(Icons.email, size: 20),
+            ),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _cuentaController,
+            style: GoogleFonts.outfit(fontWeight: FontWeight.w600, fontSize: 14),
+            keyboardType: TextInputType.number,
+            decoration: const InputDecoration(
+              labelText: 'Número de Cuenta',
+              prefixIcon: Icon(Icons.account_balance, size: 20),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'MÉTODO DE PAGO',
+            style: GoogleFonts.outfit(
+              fontSize: 11,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 1.2,
+              color: AppTheme.textSecondary,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              _buildPagoChip('Nequi', 'nequi'),
+              const SizedBox(width: 8),
+              _buildPagoChip('Daviplata', 'daviplata'),
+              const SizedBox(width: 8),
+              _buildPagoChip('Bancolombia', 'bancolombia'),
+            ],
+          ),
+          const SizedBox(height: 16),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: _isSavingConfig ? null : _saveAppConfig,
+              icon: _isSavingConfig
+                  ? const SizedBox(
+                      width: 18, height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black),
+                    )
+                  : const Icon(Icons.save_rounded, size: 18),
+              label: Text(_isSavingConfig ? 'GUARDANDO...' : 'GUARDAR DATOS'),
+              style: ElevatedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPagoChip(String label, String value) {
+    final selected = _metodoPago == value;
+    return Expanded(
+      child: GestureDetector(
+        onTap: () => setState(() => _metodoPago = value),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          decoration: BoxDecoration(
+            color: selected
+                ? AppTheme.primaryColor.withValues(alpha: 0.15)
+                : AppTheme.surfaceColor,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: selected ? AppTheme.primaryColor : AppTheme.dividerColor,
+              width: selected ? 2 : 1,
+            ),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                selected
+                    ? Icons.radio_button_checked_rounded
+                    : Icons.radio_button_unchecked_rounded,
+                size: 18,
+                color: selected ? AppTheme.primaryColor : AppTheme.textSecondary,
+              ),
+              const SizedBox(width: 6),
+              Text(
+                label,
+                style: GoogleFonts.outfit(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 13,
+                  color: selected ? AppTheme.primaryColor : AppTheme.textSecondary,
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

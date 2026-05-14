@@ -7,6 +7,7 @@ import 'package:http/http.dart' as http;
 import '../models/rifa.dart';
 import '../models/participante.dart';
 import '../models/numero.dart';
+import '../models/app_config.dart';
 import '../config/constants.dart';
 
 class FirebaseService {
@@ -687,6 +688,31 @@ class FirebaseService {
       debugPrint('[SYNC] Mensaje personalizado enviado');
     } catch (e) {
       debugPrint('[SYNC] Error enviando mensaje personalizado: $e');
+    }
+  }
+
+  Future<AppConfig?> getAppConfig() async {
+    if (_useLocalData) return null;
+    try {
+      final doc = await _firestore!.collection('config').doc('app').get();
+      if (doc.exists) {
+        return AppConfig.fromMap(doc.data()!);
+      }
+      return null;
+    } catch (e) {
+      debugPrint('[CONFIG] Error obteniendo configuración: $e');
+      return null;
+    }
+  }
+
+  Future<void> updateAppConfig(AppConfig config) async {
+    if (_useLocalData) return;
+    try {
+      await _firestore!.collection('config').doc('app').set(config.toMap());
+      debugPrint('[CONFIG] Configuración guardada');
+    } catch (e) {
+      debugPrint('[CONFIG] Error guardando configuración: $e');
+      rethrow;
     }
   }
 }
