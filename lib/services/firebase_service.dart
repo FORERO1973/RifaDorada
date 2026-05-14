@@ -450,8 +450,10 @@ class FirebaseService {
 
   Future<String> exportarDatosCSV(String rifaId, String nombreRifa) async {
     List<Participante> participantes;
+    Rifa? rifa;
     if (_useLocalData) {
       participantes = _localParticipantes[rifaId] ?? [];
+      try { rifa = _localRifas.firstWhere((r) => r.id == rifaId); } catch (_) {}
     } else {
       final snapshot = await _firestore!
           .collection('participantes')
@@ -460,22 +462,42 @@ class FirebaseService {
       participantes = snapshot.docs
           .map((doc) => Participante.fromMap(doc.data(), doc.id))
           .toList();
+      rifa = await getRifa(rifaId);
     }
 
     if (participantes.isEmpty) return '';
 
+    participantes.sort((a, b) => b.fechaRegistro.compareTo(a.fechaRegistro));
+    final precio = rifa?.precioNumero ?? 0;
+    final pagados = participantes.where((p) => p.estaPagado);
+    final abonados = participantes.where((p) => p.estaAbonado && !p.estaPagado);
+    final pendientes = participantes.where((p) => !p.estaAbonado && !p.estaPagado);
+    final totalRecaudado = pagados.fold(0.0, (s, p) => s + p.totalPagado) +
+        abonados.fold(0.0, (s, p) => s + p.totalPagado);
+    final totalPendiente = pendientes.fold(0.0, (s, p) => s + p.numeros.length * precio);
+
     final buffer = StringBuffer();
-    // Añadir BOM para que Excel reconozca caracteres especiales (tildes, ñ) en español
     buffer.write('\uFEFF');
-    // Encabezados con nombres profesionales
-    buffer.writeln('Nombre,WhatsApp,Ciudad,Documento,Números,Estado de Pago,Total,Fecha de Registro');
+    buffer.writeln('"REPORTE DE RIFA: $nombreRifa"');
+    buffer.writeln('"Generado:", "${DateFormat('dd/MM/yyyy HH:mm').format(DateTime.now())}"');
+    buffer.writeln('"Total participantes:", "${participantes.length}"');
+    buffer.writeln('"Pagados:", "${pagados.length}"');
+    buffer.writeln('"Abonados:", "${abonados.length}"');
+    buffer.writeln('"Pendientes:", "${pendientes.length}"');
+    buffer.writeln('"Total recaudado:", "${totalRecaudado.toStringAsFixed(0)}"');
+    buffer.writeln('"Saldo pendiente:", "${totalPendiente.toStringAsFixed(0)}"');
+    buffer.writeln('');
+    buffer.writeln('Nombre,WhatsApp,Ciudad,Documento,Números,Estado,Total Pagado,Valor Total,Abonos,Fecha Registro');
     
     for (final p in participantes) {
-      final estado = p.estadoPago == EstadoPago.pagado ? 'Pagado' : 'Pendiente';
+      final estado = p.estadoPago == EstadoPago.pagado ? 'Pagado' 
+          : p.estadoPago == EstadoPago.abonado ? 'Abonado' : 'Pendiente';
+      final totalValor = p.numeros.length * precio;
       final fecha = DateFormat('dd/MM/yyyy HH:mm').format(p.fechaRegistro);
+      final abonosCount = p.abonos.length;
       
       buffer.writeln(
-        '"${p.nombre}","${p.whatsapp}","${p.ciudad}","${p.documento ?? ''}","${p.numerosString}","$estado","${p.totalPagado}","$fecha"'
+        '"${p.nombre}","${p.whatsapp}","${p.ciudad}","${p.documento ?? ''}","${p.numerosString}","$estado","${p.totalPagado.toStringAsFixed(0)}","${totalValor.toStringAsFixed(0)}","$abonosCount","$fecha"'
       );
     }
     

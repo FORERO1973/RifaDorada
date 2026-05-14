@@ -6,6 +6,8 @@ import '../config/constants.dart';
 import '../providers/rifa_provider.dart';
 import '../models/rifa.dart';
 import '../services/firebase_service.dart';
+import '../services/report_service.dart';
+import '../models/app_config.dart';
 import 'login_screen.dart';
 import 'sales_list_screen.dart';
 
@@ -426,13 +428,50 @@ Widget _buildStatsSection(Map<String, dynamic> stats, Rifa rifa) {
     );
   }
 
-  void _exportData(BuildContext context, rifa, RifaProvider provider) async {
-    await provider.exportarDatosCSV();
-    if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Datos exportados para ${rifa.nombre}')),
-      );
-    }
+  void _exportData(BuildContext context, Rifa rifa, RifaProvider provider) async {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Exportar Reporte'),
+        content: const Text('Selecciona el formato:'),
+        actions: [
+          TextButton.icon(
+            onPressed: () { Navigator.pop(ctx); provider.exportarDatosCSV(); },
+            icon: const Icon(Icons.table_chart_outlined, size: 18),
+            label: const Text('CSV (Excel)'),
+          ),
+          ElevatedButton.icon(
+            onPressed: () async {
+              Navigator.pop(ctx);
+              final config = await FirebaseService.instance.getAppConfig();
+              final participantes = await FirebaseService.instance.getParticipantesOnce(rifa.id);
+              if (participantes.isEmpty) return;
+              try {
+                await ReportService.instance.generatePdfReport(
+                  rifa: rifa,
+                  participantes: participantes,
+                  organizacion: config?.organizacion,
+                );
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('✅ PDF exportado: ${rifa.nombre}')),
+                  );
+                }
+              } catch (e) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('⚠️ Error: $e'), backgroundColor: Colors.orange),
+                  );
+                }
+              }
+            },
+            icon: const Icon(Icons.picture_as_pdf, size: 18),
+            label: const Text('PDF'),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red.shade700),
+          ),
+        ],
+      ),
+    );
   }
 
   void _showLogoutDialog(BuildContext context) {
