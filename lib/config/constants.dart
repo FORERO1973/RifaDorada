@@ -10,7 +10,7 @@ class AppConstants {
   static const String countryCode = '+57';
   static const String timezone = 'America/Bogota';
 
-  static const String _defaultChatbotUrl = 'http://10.231.66.151:3008';
+  static const String _defaultChatbotUrl = 'http://192.168.200.106:3008';
   static const String _chatbotUrlKey = 'chatbot_url';
 
   static String _chatbotUrl = _defaultChatbotUrl;
