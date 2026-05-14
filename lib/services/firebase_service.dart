@@ -615,7 +615,17 @@ class FirebaseService {
     }
   }
 
-  Future<void> _notifyAbonoToChatbot(String rifaId, String whatsapp, double monto, String metodoPago) async {
+  Future<void> _notifyAbonoToChatbot({
+    required String rifaId,
+    required String whatsapp,
+    required double monto,
+    required String metodoPago,
+    required String nombre,
+    required List<String> numeros,
+    required double total,
+    required double totalPagado,
+    required List<Map<String, dynamic>> abonos,
+  }) async {
     try {
       await http.post(
         Uri.parse('${AppConstants.chatbotApi}/sync/abono'),
@@ -625,6 +635,11 @@ class FirebaseService {
           'rifaId': rifaId,
           'monto': monto,
           'metodoPago': metodoPago,
+          'nombre': nombre,
+          'numeros': numeros,
+          'total': total,
+          'totalPagado': totalPagado,
+          'abonos': abonos,
         }),
       );
       debugPrint('[SYNC] Abono notificado al chatbot');
@@ -647,8 +662,28 @@ class FirebaseService {
     }
   }
 
-  Future<void> notificarAbonoAlChatbot(String rifaId, String whatsapp, double monto, String metodoPago) async {
-    await _notifyAbonoToChatbot(rifaId, whatsapp, monto, metodoPago);
+  Future<void> notificarAbonoAlChatbot({
+    required String rifaId,
+    required String whatsapp,
+    required double monto,
+    required String metodoPago,
+    required String nombre,
+    required List<String> numeros,
+    required double total,
+    required double totalPagado,
+    required List<Map<String, dynamic>> abonos,
+  }) async {
+    await _notifyAbonoToChatbot(
+      rifaId: rifaId,
+      whatsapp: whatsapp,
+      monto: monto,
+      metodoPago: metodoPago,
+      nombre: nombre,
+      numeros: numeros,
+      total: total,
+      totalPagado: totalPagado,
+      abonos: abonos,
+    );
     await _syncParticipantesToChatbot(rifaId);
   }
 

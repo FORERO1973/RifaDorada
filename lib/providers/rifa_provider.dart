@@ -308,11 +308,22 @@ class RifaProvider extends ChangeNotifier {
 
       await _firebaseService.actualizarParticipante(nuevoParticipante);
 
+      final abonosMap = nuevosAbonos.map((a) => {
+        'fecha': a.fecha.toIso8601String(),
+        'monto': a.monto,
+        'metodoPago': a.metodoPago,
+      }).toList();
+
       await _firebaseService.notificarAbonoAlChatbot(
-        _rifaSeleccionada!.id,
-        participante.whatsappFormateado,
-        monto,
-        metodoPago,
+        rifaId: _rifaSeleccionada!.id,
+        whatsapp: participante.whatsappFormateado,
+        monto: monto,
+        metodoPago: metodoPago,
+        nombre: participante.nombre,
+        numeros: participante.numeros,
+        total: precioTotal.toDouble(),
+        totalPagado: nuevoTotalPagado,
+        abonos: abonosMap,
       );
 
       if (nuevoEstado == EstadoPago.pagado && participante.estadoPago != EstadoPago.pagado) {
