@@ -569,7 +569,7 @@ class FirebaseService {
         '*Estado:* ${estadoIcono} ${estadoTexto}',
         '',
         '━━ 📌 ━━',
-        '1. Consigna a $labelCuenta',
+        '1. Transfiere a $labelCuenta',
         '2. Envía el comprobante por este chat',
         '3. ¡Listo! Ya participas',
         '',
