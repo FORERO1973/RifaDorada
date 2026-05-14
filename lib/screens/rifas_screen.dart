@@ -7,6 +7,7 @@ import '../config/constants.dart';
 import '../providers/rifa_provider.dart';
 import '../models/rifa.dart';
 import '../models/participante.dart';
+import '../services/firebase_service.dart';
 import '../widgets/rifa_card.dart';
 import 'crear_rifa_screen.dart';
 import 'ticket_screen.dart';
@@ -507,12 +508,48 @@ class _RifaDetalleScreenState extends State<_RifaDetalleScreen> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Eliminar'), content: Text('¿Eliminar a ${p.nombre}?'),
+        title: const Text('Eliminar'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('¿Eliminar a ${p.nombre}?'),
+            const SizedBox(height: 8),
+            Text('Números: ${p.numeros.join(", ")}', style: const TextStyle(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.orange.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Row(
+                children: [
+                  Icon(Icons.info_outline, color: Colors.orange, size: 18),
+                  SizedBox(width: 8),
+                  Expanded(child: Text('Los números quedarán disponibles y se notificará al cliente.', style: TextStyle(fontSize: 12))),
+                ],
+              ),
+            ),
+          ],
+        ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context), child: const Text('CANCELAR')),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: AppTheme.errorColor),
-            onPressed: () { provider.eliminarParticipante(p.id, p.numeros); Navigator.pop(context); },
+            onPressed: () async {
+              Navigator.pop(context);
+              await provider.eliminarParticipante(p.id, p.numeros);
+              await FirebaseService.instance.enviarMensajePersonalizado(
+                p.whatsappFormateado,
+                '🔄 *Venta cancelada*\n\nHola ${p.nombre}, tu registro en la rifa ha sido cancelado y tus números (${p.numeros.join(", ")}) han sido liberados.\n\nSi tienes dudas, contacta al organizador.',
+              );
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('✅ ${p.nombre} eliminado y notificado'), backgroundColor: Colors.orange),
+                );
+              }
+            },
             child: const Text('ELIMINAR'),
           ),
         ],

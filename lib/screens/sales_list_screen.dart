@@ -295,14 +295,6 @@ class _SalesListScreenState extends State<SalesListScreen> {
                   onTap: () => _confirmDelete(p, provider),
                   label: 'Eliminar',
                 ),
-                const SizedBox(width: 8),
-                _buildActionButton(
-                  icon: Icons.undo_rounded,
-                  color: Colors.red.shade700,
-                  onTap: () => _confirmReverse(p, provider),
-                  label: 'Reversar',
-                ),
-                const SizedBox(width: 8),
                 _buildActionButton(
                   icon: Icons.message_outlined,
                   color: Colors.green,
@@ -491,90 +483,48 @@ class _SalesListScreenState extends State<SalesListScreen> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Eliminar Registro'),
-        content: Text(
-          '¿Deseas eliminar a ${p.nombre} y liberar sus números (${p.numeros.join(", ")})?',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('CANCELAR'),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.errorColor,
-            ),
-            onPressed: () {
-              provider.eliminarParticipante(p.id, p.numeros);
-              Navigator.pop(context);
-            },
-            child: const Text('ELIMINAR'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _confirmReverse(Participante p, RifaProvider provider) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Reversar Venta'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('¿Reversar la venta de *${p.nombre}*?'),
+            Text('¿Eliminar a ${p.nombre}?'),
             const SizedBox(height: 8),
-            Text(
-              'Números: ${p.numeros.join(", ")}',
-              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
-            ),
+            Text('Números: ${p.numeros.join(", ")}', style: const TextStyle(fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: Colors.red.withValues(alpha: 0.08),
+                color: Colors.orange.withValues(alpha: 0.08),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: const Row(
                 children: [
-                  Icon(Icons.warning_amber_rounded, color: Colors.red, size: 18),
+                  Icon(Icons.info_outline, color: Colors.orange, size: 18),
                   SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'Los números quedarán disponibles y se notificará al cliente.',
-                      style: TextStyle(fontSize: 12),
-                    ),
-                  ),
+                  Expanded(child: Text('Los números quedarán disponibles y se notificará al cliente.', style: TextStyle(fontSize: 12))),
                 ],
               ),
             ),
           ],
         ),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('CANCELAR'),
-          ),
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('CANCELAR')),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red.shade700),
+            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.errorColor),
             onPressed: () async {
               Navigator.pop(context);
               await provider.eliminarParticipante(p.id, p.numeros);
               await FirebaseService.instance.enviarMensajePersonalizado(
                 p.whatsappFormateado,
-                '🔄 *Venta reversada*\n\nHola ${p.nombre}, tu registro en la rifa ha sido cancelado y tus números (${p.numeros.join(", ")}) han sido liberados.\n\nSi tienes dudas, contacta al organizador.',
+                '🔄 *Venta cancelada*\n\nHola ${p.nombre}, tu registro en la rifa ha sido cancelado y tus números (${p.numeros.join(", ")}) han sido liberados.\n\nSi tienes dudas, contacta al organizador.',
               );
               if (context.mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('✅ Venta de ${p.nombre} reversada y notificado'),
-                    backgroundColor: Colors.orange,
-                  ),
+                  SnackBar(content: Text('✅ ${p.nombre} eliminado y notificado'), backgroundColor: Colors.orange),
                 );
               }
             },
-            child: const Text('REVERSAR'),
+            child: const Text('ELIMINAR'),
           ),
         ],
       ),
