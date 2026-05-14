@@ -306,7 +306,17 @@ class FirebaseService {
       return;
     }
     
-    await _firestore!.collection('participantes').doc(id).delete();
+    final batch = _firestore!.batch();
+    batch.delete(_firestore!.collection('participantes').doc(id));
+    for (final num in numeros) {
+      final numRef = _firestore!.collection('rifas').doc(rifaId).collection('numeros').doc(num);
+      batch.set(numRef, {
+        'estado': 'disponible',
+        'participanteId': '',
+        'rifaId': rifaId,
+      });
+    }
+    await batch.commit();
   }
 
   Future<Map<String, Numero>> getNumeros(String rifaId) async {
