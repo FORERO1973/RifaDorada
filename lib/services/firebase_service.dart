@@ -540,9 +540,14 @@ class FirebaseService {
   Future<void> _notifySaleToChatbot(String rifaId, List<String> numeros, Participante participante, double total) async {
     try {
       final estadoPago = participante.estadoPago == EstadoPago.pagado ? 'pagado' : 'pendiente';
-      final faltante = total - participante.totalPagado;
+      final restante = total - participante.totalPagado;
       final fecha = DateFormat('dd/MM/yyyy HH:mm').format(DateTime.now());
-      
+
+      final config = await getAppConfig();
+      final cuenta = (config?.numeroCuenta ?? '').trim();
+      final metodo = config?.metodoPago ?? 'nequi';
+      final labelCuenta = cuenta.isNotEmpty ? '$cuenta (*${metodo.toUpperCase()}*)' : '—';
+
       final estadoIcono = estadoPago == 'pagado' ? '✅' : '⏳';
       final estadoTexto = estadoPago == 'pagado' ? 'PAGADO' : 'PENDIENTE';
       final mensajeTicket = [
@@ -560,11 +565,11 @@ class FirebaseService {
         '━━ 💰 PAGO ━━',
         '*Total:* \$${total.toStringAsFixed(0)} COP',
         '*Pagado:* \$${participante.totalPagado.toStringAsFixed(0)} COP',
-        if (faltante > 0) '*Faltante:* \$${faltante.toStringAsFixed(0)} COP',
+        if (restante > 0) '*Restante:* \$${restante.toStringAsFixed(0)} COP',
         '*Estado:* ${estadoIcono} ${estadoTexto}',
         '',
         '━━ 📌 ━━',
-        '1. Consigna al número de cuenta',
+        '1. Consigna a $labelCuenta',
         '2. Envía el comprobante por este chat',
         '3. ¡Listo! Ya participas',
         '',
