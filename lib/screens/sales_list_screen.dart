@@ -462,16 +462,36 @@ class _SalesListScreenState extends State<SalesListScreen> {
   }
 
   void _contactWhatsApp(Participante p) async {
-    final status = p.estadoPago == EstadoPago.pagado
-        ? 'CONFIRMADO'
-        : 'PENDIENTE';
-    final numbers = p.numeros.join(', ');
-    final message =
-        'Hola ${p.nombre}, te hablo de RifaDorada por tu reserva en la rifa "${widget.rifa.nombre}".\n\n'
-        '📌 Números: $numbers\n'
-        '💰 Valor total: ${AppConstants.formatCurrencyCOP(p.numeros.length * widget.rifa.precioNumero)}\n'
-        'Estado: $status\n\n'
-        '${p.estadoPago == EstadoPago.pendiente ? "Por favor confirma tu pago adjuntando el comprobante." : "Gracias por tu participación!"}';
+    final config = await FirebaseService.instance.getAppConfig();
+    final cuenta = (config?.numeroCuenta ?? '').trim();
+    final metodo = config?.metodoPago ?? 'nequi';
+    final labelCuenta = cuenta.isNotEmpty ? '$cuenta (${metodo.toUpperCase()})' : 'la cuenta indicada';
+
+    final total = p.numeros.length * widget.rifa.precioNumero;
+    final restante = total - p.totalPagado;
+    final estado = p.estadoPago == EstadoPago.pagado
+        ? '✅ PAGADO'
+        : p.estadoPago == EstadoPago.abonado
+            ? '💳 ABONADO'
+            : '⏳ PENDIENTE';
+
+    final message = [
+      'Hola ${p.nombre}, te hablo de RifaDorada por tu reserva en la rifa "${widget.rifa.nombre}".',
+      '',
+      '📌 Números: ${p.numeros.join(", ")}',
+      '💰 Valor total: ${AppConstants.formatCurrencyCOP(total)}',
+      '📊 Estado: $estado',
+      restante > 0 ? '⏳ Saldo: ${AppConstants.formatCurrencyCOP(restante)}' : '',
+      '',
+      '━━ 📌 ━━',
+      '1. Consigna a $labelCuenta',
+      '2. Envía el comprobante por este chat',
+      '3. ¡Listo! Ya participas',
+      '',
+      '📞 ¿Dudas? Escribe y te ayudamos',
+      '',
+      '🍀 ¡Mucha suerte!',
+    ].where((l) => l.isNotEmpty).join('\n');
 
     final url =
         'https://wa.me/${p.whatsappFormateado}?text=${Uri.encodeComponent(message)}';

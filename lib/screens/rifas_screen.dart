@@ -529,7 +529,37 @@ class _RifaDetalleScreenState extends State<_RifaDetalleScreen> {
   }
 
   void _contactWhatsApp(Participante p, Rifa rifa) async {
-    final message = 'Hola ${p.nombre}, te contacto de RifaDorada por la rifa "${rifa.nombre}"';
+    final config = await FirebaseService.instance.getAppConfig();
+    final cuenta = (config?.numeroCuenta ?? '').trim();
+    final metodo = config?.metodoPago ?? 'nequi';
+    final labelCuenta = cuenta.isNotEmpty ? '$cuenta (${metodo.toUpperCase()})' : 'la cuenta indicada';
+
+    final total = p.numeros.length * rifa.precioNumero;
+    final restante = total - p.totalPagado;
+    final estado = p.estadoPago == EstadoPago.pagado
+        ? '✅ PAGADO'
+        : p.estadoPago == EstadoPago.abonado
+            ? '💳 ABONADO'
+            : '⏳ PENDIENTE';
+
+    final message = [
+      'Hola ${p.nombre}, te hablo de RifaDorada por tu reserva en la rifa "${rifa.nombre}".',
+      '',
+      '📌 Números: ${p.numeros.join(", ")}',
+      '💰 Valor total: ${AppConstants.formatCurrencyCOP(total)}',
+      '📊 Estado: $estado',
+      if (restante > 0) '⏳ Saldo: ${AppConstants.formatCurrencyCOP(restante)}',
+      '',
+      '━━ 📌 ━━',
+      '1. Consigna a $labelCuenta',
+      '2. Envía el comprobante por este chat',
+      '3. ¡Listo! Ya participas',
+      '',
+      '📞 ¿Dudas? Escribe y te ayudamos',
+      '',
+      '🍀 ¡Mucha suerte!',
+    ].join('\n');
+
     final url = 'https://wa.me/${p.whatsappFormateado}?text=${Uri.encodeComponent(message)}';
     if (await canLaunchUrl(Uri.parse(url))) await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
   }
