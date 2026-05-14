@@ -179,7 +179,9 @@ class _TicketScreenState extends State<TicketScreen> {
   }
 
   Widget _buildTicket(BuildContext context) {
-    final isPaid = widget.participante.estadoPago == EstadoPago.pagado;
+    final estado = widget.participante.estadoPago;
+    final isPaid = estado == EstadoPago.pagado;
+    final isAbonado = estado == EstadoPago.abonado;
 
     return Container(
       width: double.infinity,
@@ -368,11 +370,13 @@ class _TicketScreenState extends State<TicketScreen> {
                       decoration: BoxDecoration(
                         color: isPaid
                             ? AppTheme.secondaryColor
-                            : AppTheme.errorColor,
+                            : isAbonado
+                                ? Colors.orange
+                                : AppTheme.errorColor,
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Text(
-                        isPaid ? 'PAGADO' : 'PENDIENTE',
+                        isPaid ? 'PAGADO' : isAbonado ? 'ABONADO' : 'PENDIENTE',
                         style: const TextStyle(
                           fontWeight: FontWeight.bold,
                           color: Colors.white,
