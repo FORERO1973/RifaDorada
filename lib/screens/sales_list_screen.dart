@@ -534,13 +534,13 @@ class _SalesListScreenState extends State<SalesListScreen> {
     );
   }
 
-  void _showAbonoDialog(BuildContext context, Participante p, RifaProvider provider) {
+  void _showAbonoDialog(BuildContext screenContext, Participante p, RifaProvider provider) {
     final montoController = TextEditingController();
     final notaController = TextEditingController();
     String metodoPago = 'efectivo';
 
     showDialog(
-      context: context,
+      context: screenContext,
       builder: (context) => StatefulBuilder(
         builder: (context, setState) {
           final precioTotal = p.numeros.length * widget.rifa.precioNumero;
@@ -635,7 +635,7 @@ class _SalesListScreenState extends State<SalesListScreen> {
                     );
                     return;
                   }
-                  final error = await provider.registrarAbono(
+                  final (error, estado) = await provider.registrarAbono(
                     participanteId: p.id,
                     monto: montoVal,
                     nota: notaController.text.isNotEmpty ? notaController.text : null,
@@ -644,14 +644,28 @@ class _SalesListScreenState extends State<SalesListScreen> {
                     precioNumero: widget.rifa.precioNumero,
                   );
                   if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(error ?? '✅ Abono registrado correctamente'),
-                        backgroundColor: error != null ? Colors.orange : AppTheme.secondaryColor,
-                      ),
-                    );
+                    if (error != null) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('⚠️ $error'), backgroundColor: Colors.orange),
+                      );
+                    } else {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('✅ Abono registrado. Enviando ticket...'),
+                          backgroundColor: AppTheme.secondaryColor,
+                          duration: const Duration(seconds: 1),
+                        ),
+                      );
+                    }
                   }
                   Navigator.pop(context);
+                  if (error == null && screenContext.mounted) {
+                    final idx = provider.participantes.indexWhere((x) => x.id == p.id);
+                    final updated = idx >= 0 ? provider.participantes[idx] : p;
+                    Navigator.push(screenContext, MaterialPageRoute(
+                      builder: (_) => TicketScreen(participante: updated, rifa: widget.rifa, autoSend: true),
+                    ));
+                  }
                 },
                 child: const Text('REGISTRAR ABONO'),
               ),

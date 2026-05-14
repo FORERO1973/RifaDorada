@@ -253,7 +253,7 @@ class RifaProvider extends ChangeNotifier {
     }
   }
 
-  Future<String?> registrarAbono({
+  Future<(String? error, EstadoPago? estado)> registrarAbono({
     required String participanteId,
     required double monto,
     String? nota,
@@ -262,7 +262,7 @@ class RifaProvider extends ChangeNotifier {
     double? precioNumero,
   }) async {
     final rid = rifaId ?? _rifaSeleccionada?.id;
-    if (rid == null) return 'No hay rifa seleccionada';
+    if (rid == null) return ('No hay rifa seleccionada', null);
 
     try {
       if (rifaId != null && _rifaSeleccionada?.id != rifaId) {
@@ -346,11 +346,11 @@ class RifaProvider extends ChangeNotifier {
 
       await loadParticipantes(rid);
       await loadNumeros(rid);
-      return null;
+      return (null, nuevoEstado);
     } catch (e) {
       _error = e.toString();
       notifyListeners();
-      return _error;
+      return (_error, null);
     }
   }
 
