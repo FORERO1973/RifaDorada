@@ -385,17 +385,14 @@ class RifaProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> eliminarParticipante(String id, List<String> numeros) async {
-    if (_rifaSeleccionada == null) return;
+  Future<void> eliminarParticipante(String id, List<String> numeros, {String? rifaId}) async {
+    final rid = rifaId ?? _rifaSeleccionada?.id;
+    if (rid == null) return;
 
     try {
-      await _firebaseService.eliminarParticipante(
-        id,
-        _rifaSeleccionada!.id,
-        numeros,
-      );
-      await loadParticipantes(_rifaSeleccionada!.id);
-      await loadNumeros(_rifaSeleccionada!.id);
+      await _firebaseService.eliminarParticipante(id, rid, numeros);
+      await loadParticipantes(rid);
+      await loadNumeros(rid);
     } catch (e) {
       _error = e.toString();
       notifyListeners();

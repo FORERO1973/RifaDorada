@@ -513,7 +513,7 @@ class _SalesListScreenState extends State<SalesListScreen> {
             style: ElevatedButton.styleFrom(backgroundColor: AppTheme.errorColor),
             onPressed: () async {
               Navigator.pop(context);
-              await provider.eliminarParticipante(p.id, p.numeros);
+              await provider.eliminarParticipante(p.id, p.numeros, rifaId: widget.rifa.id);
               await FirebaseService.instance.enviarMensajePersonalizado(
                 p.whatsappFormateado,
                 '🔄 *Venta cancelada*\n\nHola ${p.nombre}, tu registro en la rifa ha sido cancelado y tus números (${p.numeros.join(", ")}) han sido liberados.\n\nSi tienes dudas, contacta al organizador.',
