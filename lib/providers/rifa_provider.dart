@@ -377,6 +377,13 @@ class RifaProvider extends ChangeNotifier {
         }
       }
 
+      if (pagado) {
+        await _firebaseService.reenviarTicket(
+          nuevoParticipante.rifaId,
+          nuevoParticipante.whatsappFormateado,
+        );
+      }
+
       await loadParticipantes(_rifaSeleccionada!.id);
       await loadNumeros(_rifaSeleccionada!.id);
     } catch (e) {
