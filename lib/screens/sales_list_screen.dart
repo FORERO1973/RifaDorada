@@ -627,20 +627,30 @@ class _SalesListScreenState extends State<SalesListScreen> {
               ),
               ElevatedButton(
                 style: ElevatedButton.styleFrom(backgroundColor: Colors.orange),
-                onPressed: () {
-                  final monto = double.tryParse(montoController.text);
-                  if (monto == null || monto <= 0) {
+                onPressed: () async {
+                  final montoVal = double.tryParse(montoController.text);
+                  if (montoVal == null || montoVal <= 0) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(content: Text('Ingrese un monto válido')),
                     );
                     return;
                   }
-                  provider.registrarAbono(
+                  final error = await provider.registrarAbono(
                     participanteId: p.id,
-                    monto: monto,
+                    monto: montoVal,
                     nota: notaController.text.isNotEmpty ? notaController.text : null,
                     metodoPago: metodoPago,
+                    rifaId: widget.rifa.id,
+                    precioNumero: widget.rifa.precioNumero,
                   );
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(error ?? '✅ Abono registrado correctamente'),
+                        backgroundColor: error != null ? Colors.orange : AppTheme.secondaryColor,
+                      ),
+                    );
+                  }
                   Navigator.pop(context);
                 },
                 child: const Text('REGISTRAR ABONO'),

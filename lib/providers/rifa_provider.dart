@@ -253,19 +253,28 @@ class RifaProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> registrarAbono({
+  Future<String?> registrarAbono({
     required String participanteId,
     required double monto,
     String? nota,
     String metodoPago = 'efectivo',
+    String? rifaId,
+    double? precioNumero,
   }) async {
-    if (_rifaSeleccionada == null) return;
+    final rid = rifaId ?? _rifaSeleccionada?.id;
+    if (rid == null) return 'No hay rifa seleccionada';
 
     try {
+      if (rifaId != null && _rifaSeleccionada?.id != rifaId) {
+        await loadParticipantes(rifaId);
+        await loadNumeros(rifaId);
+      }
+
       final participante = _participantes.firstWhere(
         (p) => p.id == participanteId,
       );
 
+      final pNumero = precioNumero ?? _rifaSeleccionada?.precioNumero ?? 0;
       final abonoId = DateTime.now().millisecondsSinceEpoch.toString();
       final abono = Abono(
         id: abonoId,
@@ -288,7 +297,7 @@ class RifaProvider extends ChangeNotifier {
       final nuevosAbonos = [...participante.abonos, abono];
       final nuevoHistorial = [...participante.historial, historial];
       final nuevoTotalPagado = participante.totalPagado + monto;
-      final precioTotal = participante.numeros.length * _rifaSeleccionada!.precioNumero;
+      final precioTotal = participante.numeros.length * pNumero;
 
       EstadoPago nuevoEstado;
       if (nuevoTotalPagado >= precioTotal) {
@@ -315,7 +324,7 @@ class RifaProvider extends ChangeNotifier {
       }).toList();
 
       await _firebaseService.notificarAbonoAlChatbot(
-        rifaId: _rifaSeleccionada!.id,
+        rifaId: rid,
         whatsapp: participante.whatsappFormateado,
         monto: monto,
         metodoPago: metodoPago,
@@ -330,16 +339,18 @@ class RifaProvider extends ChangeNotifier {
         for (final num in participante.numeros) {
           final numeroObj = _numeros[num]?.copyWith(estado: EstadoNumero.pagado);
           if (numeroObj != null) {
-            await _firebaseService.actualizarNumero(_rifaSeleccionada!.id, num, numeroObj);
+            await _firebaseService.actualizarNumero(rid, num, numeroObj);
           }
         }
       }
 
-      await loadParticipantes(_rifaSeleccionada!.id);
-      await loadNumeros(_rifaSeleccionada!.id);
+      await loadParticipantes(rid);
+      await loadNumeros(rid);
+      return null;
     } catch (e) {
       _error = e.toString();
       notifyListeners();
+      return _error;
     }
   }
 
