@@ -520,8 +520,10 @@ class _RifaDetalleScreenState extends State<_RifaDetalleScreen> {
 
     final rifa = provider.rifaSeleccionada;
     if (!ctx.mounted || rifa == null) return;
+    final idx = provider.participantes.indexWhere((x) => x.id == p.id);
+    final updated = idx >= 0 ? provider.participantes[idx] : p;
     Navigator.push(ctx, MaterialPageRoute(
-      builder: (_) => TicketScreen(participante: p, rifa: rifa, autoSend: true),
+      builder: (_) => TicketScreen(participante: updated, rifa: rifa, autoSend: true),
     ));
   }
 
