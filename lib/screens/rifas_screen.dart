@@ -451,7 +451,7 @@ class _RifaDetalleScreenState extends State<_RifaDetalleScreen> {
                     Expanded(
                       child: !isPaid
                         ? ElevatedButton.icon(
-                            onPressed: () => _confirmAction(context, 'Confirmar Pago', '¿Estás seguro de marcar como PAGADO a ${p.nombre}?', () => provider.marcarPago(p.id, true)),
+                            onPressed: () => _confirmPago(context, p, provider),
                             icon: const Icon(Icons.check_circle_outline, size: 16),
                             label: const Text('PAGAR', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
                             style: ElevatedButton.styleFrom(backgroundColor: AppTheme.secondaryColor, foregroundColor: Colors.white, minimumSize: const Size(0, 38)),
@@ -496,6 +496,33 @@ class _RifaDetalleScreenState extends State<_RifaDetalleScreen> {
         ],
       ),
     );
+  }
+
+  Future<void> _confirmPago(BuildContext ctx, Participante p, RifaProvider provider) async {
+    final confirm = await showDialog<bool>(
+      context: ctx,
+      builder: (context) => AlertDialog(
+        title: const Text('Confirmar Pago'),
+        content: Text('¿Estás seguro de marcar como PAGADO a ${p.nombre}?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('CANCELAR')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.secondaryColor),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('CONFIRMAR'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+    await provider.marcarPago(p.id, true);
+
+    final rifa = provider.rifaSeleccionada;
+    if (!ctx.mounted || rifa == null) return;
+    Navigator.push(ctx, MaterialPageRoute(
+      builder: (_) => TicketScreen(participante: p, rifa: rifa, autoSend: true),
+    ));
   }
 
   void _contactWhatsApp(Participante p, Rifa rifa) async {

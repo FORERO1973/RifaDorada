@@ -325,22 +325,9 @@ class _SalesListScreenState extends State<SalesListScreen> {
                 Expanded(
                   child: !isPaid
                       ? ElevatedButton.icon(
-                          onPressed: () => _confirmAction(
-                            context,
-                            title: 'Confirmar Pago',
-                            message: '¿Estás seguro de marcar como PAGADO a ${p.nombre}?',
-                            onConfirm: () => provider.marcarPago(p.id, true),
-                          ),
+                          onPressed: () => _confirmPago(context, p, provider),
                           icon: const Icon(Icons.check_circle_outline, size: 16),
-                          label: const Text(
-                            'PAGAR',
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.bold,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
+                          label: const Text('PAGAR', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold), maxLines: 1, overflow: TextOverflow.ellipsis),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: AppTheme.secondaryColor,
                             foregroundColor: Colors.white,
@@ -349,22 +336,9 @@ class _SalesListScreenState extends State<SalesListScreen> {
                           ),
                         )
                       : OutlinedButton.icon(
-                          onPressed: () => _confirmAction(
-                            context,
-                            title: 'Revertir Pago',
-                            message: '¿Estás seguro de REVERTIR el pago de ${p.nombre}?',
-                            onConfirm: () => provider.marcarPago(p.id, false),
-                          ),
+                          onPressed: () => _confirmAction(context, title: 'Revertir Pago', message: '¿Estás seguro de REVERTIR el pago de ${p.nombre}?', onConfirm: () => provider.marcarPago(p.id, false)),
                           icon: const Icon(Icons.history, size: 16),
-                          label: const Text(
-                            'REVERTIR',
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.bold,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
+                          label: const Text('REVERTIR', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold), maxLines: 1, overflow: TextOverflow.ellipsis),
                           style: OutlinedButton.styleFrom(
                             foregroundColor: AppTheme.textSecondary,
                             padding: const EdgeInsets.symmetric(horizontal: 8),
@@ -407,6 +381,33 @@ class _SalesListScreenState extends State<SalesListScreen> {
         ],
       ),
     );
+  }
+
+  Future<void> _confirmPago(BuildContext ctx, Participante p, RifaProvider provider) async {
+    final confirm = await showDialog<bool>(
+      context: ctx,
+      builder: (context) => AlertDialog(
+        title: const Text('Confirmar Pago'),
+        content: Text('¿Estás seguro de marcar como PAGADO a ${p.nombre}?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('CANCELAR')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.secondaryColor),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('CONFIRMAR'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
+    await provider.marcarPago(p.id, true);
+
+    if (!ctx.mounted) return;
+    Navigator.push(ctx, MaterialPageRoute(
+      builder: (_) => TicketScreen(participante: p, rifa: widget.rifa, autoSend: true),
+    ));
   }
 
   Widget _buildActionButton({
