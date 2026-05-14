@@ -421,7 +421,7 @@ class _ConfiguracionScreenState extends State<ConfiguracionScreen> {
       );
     }
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: AppTheme.cardColor,
         borderRadius: BorderRadius.circular(20),
@@ -430,92 +430,64 @@ class _ConfiguracionScreenState extends State<ConfiguracionScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          TextField(
-            controller: _orgController,
-            style: GoogleFonts.outfit(fontWeight: FontWeight.w600, fontSize: 14),
-            decoration: const InputDecoration(
-              labelText: 'Organización',
-              prefixIcon: Icon(Icons.business, size: 20),
-            ),
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: _respController,
-            style: GoogleFonts.outfit(fontWeight: FontWeight.w600, fontSize: 14),
-            decoration: const InputDecoration(
-              labelText: 'Responsable',
-              prefixIcon: Icon(Icons.person, size: 20),
-            ),
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: _telController,
-            style: GoogleFonts.outfit(fontWeight: FontWeight.w600, fontSize: 14),
-            keyboardType: TextInputType.phone,
-            decoration: const InputDecoration(
-              labelText: 'Teléfono',
-              prefixIcon: Icon(Icons.phone, size: 20),
-            ),
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: _emailController,
-            style: GoogleFonts.outfit(fontWeight: FontWeight.w600, fontSize: 14),
-            keyboardType: TextInputType.emailAddress,
-            decoration: const InputDecoration(
-              labelText: 'Email',
-              prefixIcon: Icon(Icons.email, size: 20),
-            ),
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: _cuentaController,
-            style: GoogleFonts.outfit(fontWeight: FontWeight.w600, fontSize: 14),
-            keyboardType: TextInputType.number,
-            decoration: const InputDecoration(
-              labelText: 'Número de Cuenta',
-              prefixIcon: Icon(Icons.account_balance, size: 20),
-            ),
-          ),
-          const SizedBox(height: 16),
+          _buildCompactField(_orgController, 'Organización', Icons.business),
+          const SizedBox(height: 8),
+          _buildCompactField(_respController, 'Responsable', Icons.person),
+          const SizedBox(height: 8),
+          _buildCompactField(_telController, 'Teléfono', Icons.phone, TextInputType.phone),
+          const SizedBox(height: 8),
+          _buildCompactField(_emailController, 'Email', Icons.email, TextInputType.emailAddress),
+          const SizedBox(height: 8),
+          _buildCompactField(_cuentaController, 'N° Cuenta', Icons.account_balance, TextInputType.number),
+          const SizedBox(height: 10),
           Text(
             'MÉTODO DE PAGO',
             style: GoogleFonts.outfit(
-              fontSize: 11,
-              fontWeight: FontWeight.w800,
-              letterSpacing: 1.2,
-              color: AppTheme.textSecondary,
+              fontSize: 10, fontWeight: FontWeight.w800,
+              letterSpacing: 1.2, color: AppTheme.textSecondary,
             ),
           ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              _buildPagoChip('Nequi', 'nequi'),
-              const SizedBox(width: 8),
-              _buildPagoChip('Daviplata', 'daviplata'),
-              const SizedBox(width: 8),
-              _buildPagoChip('Bancolombia', 'bancolombia'),
-            ],
-          ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 6),
+          Row(children: [
+            _buildPagoChip('Nequi', 'nequi'),
+            const SizedBox(width: 6),
+            _buildPagoChip('Daviplata', 'daviplata'),
+            const SizedBox(width: 6),
+            _buildPagoChip('Bancolombia', 'bancolombia'),
+          ]),
+          const SizedBox(height: 10),
           SizedBox(
             width: double.infinity,
             child: ElevatedButton.icon(
               onPressed: _isSavingConfig ? null : _saveAppConfig,
               icon: _isSavingConfig
-                  ? const SizedBox(
-                      width: 18, height: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black),
-                    )
-                  : const Icon(Icons.save_rounded, size: 18),
-              label: Text(_isSavingConfig ? 'GUARDANDO...' : 'GUARDAR DATOS'),
+                  ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black))
+                  : const Icon(Icons.save_rounded, size: 16),
+              label: Text(_isSavingConfig ? 'GUARDANDO...' : 'GUARDAR', style: GoogleFonts.outfit(fontWeight: FontWeight.w700, fontSize: 13)),
               style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                padding: const EdgeInsets.symmetric(vertical: 10),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                minimumSize: const Size.fromHeight(36),
               ),
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildCompactField(TextEditingController ctrl, String label, IconData icon, [TextInputType? kbType]) {
+    return TextField(
+      controller: ctrl,
+      style: GoogleFonts.outfit(fontWeight: FontWeight.w600, fontSize: 13),
+      keyboardType: kbType,
+      decoration: InputDecoration(
+        labelText: label,
+        labelStyle: GoogleFonts.outfit(fontSize: 12),
+        prefixIcon: Icon(icon, size: 18),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        isDense: true,
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
       ),
     );
   }
@@ -526,36 +498,21 @@ class _ConfiguracionScreenState extends State<ConfiguracionScreen> {
       child: GestureDetector(
         onTap: () => setState(() => _metodoPago = value),
         child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 12),
+          padding: const EdgeInsets.symmetric(vertical: 8),
           decoration: BoxDecoration(
-            color: selected
-                ? AppTheme.primaryColor.withValues(alpha: 0.15)
-                : AppTheme.surfaceColor,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: selected ? AppTheme.primaryColor : AppTheme.dividerColor,
-              width: selected ? 2 : 1,
-            ),
+            color: selected ? AppTheme.primaryColor.withValues(alpha: 0.15) : AppTheme.surfaceColor,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: selected ? AppTheme.primaryColor : AppTheme.dividerColor, width: selected ? 2 : 1),
           ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Icon(
-                selected
-                    ? Icons.radio_button_checked_rounded
-                    : Icons.radio_button_unchecked_rounded,
-                size: 18,
-                color: selected ? AppTheme.primaryColor : AppTheme.textSecondary,
+                selected ? Icons.radio_button_checked_rounded : Icons.radio_button_unchecked_rounded,
+                size: 14, color: selected ? AppTheme.primaryColor : AppTheme.textSecondary,
               ),
-              const SizedBox(width: 6),
-              Text(
-                label,
-                style: GoogleFonts.outfit(
-                  fontWeight: FontWeight.w700,
-                  fontSize: 13,
-                  color: selected ? AppTheme.primaryColor : AppTheme.textSecondary,
-                ),
-              ),
+              const SizedBox(width: 4),
+              Text(label, style: GoogleFonts.outfit(fontWeight: FontWeight.w700, fontSize: 11, color: selected ? AppTheme.primaryColor : AppTheme.textSecondary)),
             ],
           ),
         ),
