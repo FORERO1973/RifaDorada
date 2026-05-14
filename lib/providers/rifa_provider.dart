@@ -343,12 +343,21 @@ class RifaProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> marcarPago(String participanteId, bool pagado) async {
+  Future<void> marcarPago(String participanteId, bool pagado, {String? rifaId, double? precioNumero}) async {
     try {
+      final rid = rifaId ?? _rifaSeleccionada?.id;
+      if (rid == null) return;
+
+      if (rifaId != null && _rifaSeleccionada?.id != rifaId) {
+        await loadParticipantes(rifaId);
+        await loadNumeros(rifaId);
+      }
+
       final participante = _participantes.firstWhere(
         (p) => p.id == participanteId,
       );
 
+      final pNumero = precioNumero ?? _rifaSeleccionada?.precioNumero ?? 0;
       final historialId = DateTime.now().millisecondsSinceEpoch.toString();
       final historial = HistorialCambio(
         id: historialId,
@@ -359,7 +368,7 @@ class RifaProvider extends ChangeNotifier {
         valorNuevo: pagado ? 'pagado' : 'pendiente',
       );
 
-      final precioTotal = participante.numeros.length * _rifaSeleccionada!.precioNumero;
+      final precioTotal = participante.numeros.length * pNumero;
       final nuevoParticipante = participante.copyWith(
         estadoPago: pagado ? EstadoPago.pagado : EstadoPago.pendiente,
         totalPagado: pagado ? precioTotal : 0,
@@ -373,12 +382,12 @@ class RifaProvider extends ChangeNotifier {
           estado: pagado ? EstadoNumero.pagado : EstadoNumero.reservado,
         );
         if (numeroObj != null) {
-          await _firebaseService.actualizarNumero(_rifaSeleccionada!.id, num, numeroObj);
+          await _firebaseService.actualizarNumero(rid, num, numeroObj);
         }
       }
 
-      await loadParticipantes(_rifaSeleccionada!.id);
-      await loadNumeros(_rifaSeleccionada!.id);
+      await loadParticipantes(rid);
+      await loadNumeros(rid);
     } catch (e) {
       _error = e.toString();
       notifyListeners();

@@ -516,12 +516,13 @@ class _RifaDetalleScreenState extends State<_RifaDetalleScreen> {
     );
 
     if (confirm != true) return;
-    await provider.marcarPago(p.id, true);
-
     final rifa = provider.rifaSeleccionada;
-    if (!ctx.mounted || rifa == null) return;
+    if (rifa == null) return;
+    await provider.marcarPago(p.id, true, rifaId: rifa.id, precioNumero: rifa.precioNumero);
+
+    if (!ctx.mounted) return;
     final idx = provider.participantes.indexWhere((x) => x.id == p.id);
-    final updated = idx >= 0 ? provider.participantes[idx] : p;
+    final updated = idx >= 0 ? provider.participantes[idx] : p.copyWith(estadoPago: EstadoPago.pagado, totalPagado: p.numeros.length * rifa.precioNumero);
     Navigator.push(ctx, MaterialPageRoute(
       builder: (_) => TicketScreen(participante: updated, rifa: rifa, autoSend: true),
     ));

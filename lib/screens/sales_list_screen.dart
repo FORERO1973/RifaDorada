@@ -402,11 +402,11 @@ class _SalesListScreenState extends State<SalesListScreen> {
 
     if (confirm != true) return;
 
-    await provider.marcarPago(p.id, true);
+    await provider.marcarPago(p.id, true, rifaId: widget.rifa.id, precioNumero: widget.rifa.precioNumero);
 
     if (!ctx.mounted) return;
     final idx = provider.participantes.indexWhere((x) => x.id == p.id);
-    final updated = idx >= 0 ? provider.participantes[idx] : p;
+    final updated = idx >= 0 ? provider.participantes[idx] : p.copyWith(estadoPago: EstadoPago.pagado, totalPagado: p.numeros.length * widget.rifa.precioNumero);
     Navigator.push(ctx, MaterialPageRoute(
       builder: (_) => TicketScreen(participante: updated, rifa: widget.rifa, autoSend: true),
     ));
