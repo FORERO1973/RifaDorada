@@ -1,6 +1,6 @@
 import 'dart:io';
-import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart' show rootBundle;
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:share_plus/share_plus.dart';
@@ -13,6 +13,10 @@ class ReportService {
   static final ReportService instance = ReportService._();
   ReportService._();
 
+  static const _navy = 0xFF1B2A4A;
+  static const _gold = 0xFFD4AF37;
+  static const _accent = 0xFFF5F0E8;
+
   Future<void> generatePdfReport({
     required Rifa rifa,
     required List<Participante> participantes,
@@ -20,20 +24,29 @@ class ReportService {
   }) async {
     final pdf = pw.Document();
 
+    Uint8List? logoBytes;
+    try {
+      final data = await rootBundle.load('assets/logo/logo.png');
+      logoBytes = data.buffer.asUint8List();
+    } catch (_) {
+      logoBytes = null;
+    }
+
     pdf.addPage(
       pw.MultiPage(
         pageFormat: PdfPageFormat.a4,
-        margin: const pw.EdgeInsets.all(40),
+        margin: const pw.EdgeInsets.symmetric(horizontal: 35, vertical: 30),
         theme: pw.ThemeData.withFont(
-          base: await pw.Font.helvetica(),
-          bold: await pw.Font.helveticaBold(),
+          base: pw.Font.helvetica(),
+          bold: pw.Font.helveticaBold(),
         ),
+        header: (context) => _buildHeader(rifa, organizacion, logoBytes),
+        footer: (context) => _buildFooter(context),
         build: (context) => [
-          _buildHeader(rifa, organizacion),
+          pw.SizedBox(height: 20),
           _buildSummary(participantes, rifa),
           pw.SizedBox(height: 24),
           _buildTable(participantes, rifa),
-          _buildFooter(),
         ],
       ),
     );
@@ -42,66 +55,64 @@ class ReportService {
     await _share(bytes, rifa.nombre);
   }
 
-  pw.Widget _buildHeader(Rifa rifa, String? organizacion) {
-    return pw.Column(
-      children: [
-        pw.Container(
-          padding: const pw.EdgeInsets.all(20),
-          decoration: pw.BoxDecoration(
-            color: PdfColor.fromInt(0xFFFFD700),
-            borderRadius: const pw.BorderRadius.all(pw.Radius.circular(10)),
+  pw.Widget _buildHeader(Rifa rifa, String? organizacion, Uint8List? logo) {
+    return pw.Container(
+      padding: const pw.EdgeInsets.fromLTRB(20, 16, 20, 14),
+      decoration: pw.BoxDecoration(
+        gradient: pw.LinearGradient(
+          colors: [PdfColor.fromInt(_navy), PdfColor.fromInt(0xFF2C3E6B)],
+          begin: pw.Alignment.centerLeft,
+          end: pw.Alignment.centerRight,
+        ),
+        borderRadius: const pw.BorderRadius.only(
+          topLeft: pw.Radius.circular(12),
+          topRight: pw.Radius.circular(12),
+          bottomLeft: pw.Radius.circular(4),
+          bottomRight: pw.Radius.circular(4),
+        ),
+      ),
+      child: pw.Row(
+        crossAxisAlignment: pw.CrossAxisAlignment.center,
+        children: [
+          if (logo != null)
+            pw.Padding(
+              padding: const pw.EdgeInsets.only(right: 14),
+              child: pw.Image(pw.MemoryImage(logo), width: 48, height: 48),
+            ),
+          pw.Expanded(
+            child: pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                pw.Text(
+                  (organizacion ?? 'RIFADORADA').toUpperCase(),
+                  style: pw.TextStyle(
+                    fontSize: 16, fontWeight: pw.FontWeight.bold, color: PdfColors.white,
+                    letterSpacing: 2,
+                  ),
+                ),
+                pw.SizedBox(height: 2),
+                pw.Text(
+                  rifa.nombre,
+                  style: pw.TextStyle(fontSize: 10, color: PdfColor.fromInt(_gold)),
+                ),
+              ],
+            ),
           ),
-          child: pw.Column(
+          pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.end,
             children: [
-              pw.Text(
-                (organizacion ?? 'RIFADORADA').toUpperCase(),
-                style: pw.TextStyle(
-                  fontSize: 22, fontWeight: pw.FontWeight.bold, color: PdfColors.black,
-                ),
-              ),
-              pw.SizedBox(height: 4),
-              pw.Text(
-                'REPORTE DE RIFA',
-                style: pw.TextStyle(
-                  fontSize: 26, fontWeight: pw.FontWeight.bold, color: PdfColors.black,
-                ),
-              ),
-              pw.SizedBox(height: 8),
-              pw.Container(height: 1, color: PdfColors.grey600),
-              pw.SizedBox(height: 8),
-              pw.Text(
-                rifa.nombre,
-                style: pw.TextStyle(fontSize: 14, color: PdfColors.black),
-              ),
+              pw.Text('REPORTE DE RIFA',
+                  style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold, color: PdfColors.white)),
+              pw.SizedBox(height: 2),
+              if (rifa.fechaSorteo != null)
+                pw.Text('Sorteo: ${DateFormat('dd/MM/yyyy').format(rifa.fechaSorteo!)}',
+                    style: pw.TextStyle(fontSize: 8, color: PdfColor.fromInt(_gold))),
+              pw.Text('Creada: ${DateFormat('dd/MM/yyyy').format(rifa.fechaCreacion)}',
+                  style: pw.TextStyle(fontSize: 8, color: PdfColor.fromInt(_gold))),
             ],
           ),
-        ),
-        pw.SizedBox(height: 16),
-        pw.Row(
-          mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-          children: [
-            _infoItem('Tipo', rifa.tipoRifa),
-            _infoItem('Valor', '\$${NumberFormat('#,###').format(rifa.precioNumero)}'),
-            _infoItem('Total Números', '${rifa.cantidadNumeros}'),
-            _infoItem('Creada', DateFormat('dd/MM/yyyy').format(rifa.fechaCreacion)),
-            if (rifa.fechaSorteo != null)
-              _infoItem('Sorteo', DateFormat('dd/MM/yyyy').format(rifa.fechaSorteo!)),
-          ],
-        ),
-        pw.SizedBox(height: 20),
-      ],
-    );
-  }
-
-  pw.Widget _infoItem(String label, String value) {
-    return pw.Column(
-      crossAxisAlignment: pw.CrossAxisAlignment.start,
-      children: [
-        pw.Text(label.toUpperCase(),
-            style: pw.TextStyle(fontSize: 7, color: PdfColors.grey600)),
-        pw.SizedBox(height: 2),
-        pw.Text(value, style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold)),
-      ],
+        ],
+      ),
     );
   }
 
@@ -112,84 +123,118 @@ class ReportService {
 
     final recaudado = pagados.fold<double>(0, (s, p) => s + p.totalPagado) +
         abonados.fold<double>(0, (s, p) => s + p.totalPagado);
-
     final porCobrar = pendientes.fold<double>(0, (s, p) => s + p.numeros.length * rifa.precioNumero)
         + abonados.fold<double>(0, (s, p) => s + (p.numeros.length * rifa.precioNumero - p.totalPagado));
-
     final vendidos = participantes.fold<int>(0, (s, p) => s + p.numeros.length);
     final disponibles = rifa.cantidadNumeros - vendidos;
-    final pct = rifa.cantidadNumeros > 0 ? (vendidos * 100 / rifa.cantidadNumeros).toStringAsFixed(0) : '0';
+    final pct = rifa.cantidadNumeros > 0 ? (vendidos * 100 / rifa.cantidadNumeros) : 0.0;
 
+    return pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.start,
+      children: [
+        pw.Text('RESUMEN EJECUTIVO',
+            style: pw.TextStyle(fontSize: 13, fontWeight: pw.FontWeight.bold)),
+        pw.SizedBox(height: 10),
+        _progressBar(pct),
+        pw.SizedBox(height: 10),
+        pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceEvenly, children: [
+          _summaryCard('Vendidos', '$vendidos / ${rifa.cantidadNumeros}', '${pct.toStringAsFixed(0)}%', PdfColors.blue800),
+          _summaryCard('Disponibles', '$disponibles', '', PdfColors.grey600),
+        ]),
+        pw.SizedBox(height: 6),
+        pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceEvenly, children: [
+          _summaryCard('Pagados', '${pagados.length}', '', PdfColors.green700),
+          _summaryCard('Abonados', '${abonados.length}', '', PdfColors.orange700),
+          _summaryCard('Pendientes', '${pendientes.length}', '', PdfColors.red700),
+        ]),
+        pw.SizedBox(height: 10),
+        pw.Divider(color: PdfColors.grey300),
+        pw.SizedBox(height: 8),
+        pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceEvenly, children: [
+          _summaryCard('Recaudado', '\$${NumberFormat('#,###').format(recaudado)}', '', PdfColors.green700),
+          _summaryCard('Por Cobrar', '\$${NumberFormat('#,###').format(porCobrar)}', '', PdfColors.orange700),
+          _summaryCard('Potencial', '\$${NumberFormat('#,###').format(recaudado + porCobrar)}', '', PdfColors.blue800),
+        ]),
+      ],
+    );
+  }
+
+  pw.Widget _progressBar(double pct) {
     return pw.Container(
-      padding: const pw.EdgeInsets.all(16),
+      height: 18,
+      padding: const pw.EdgeInsets.symmetric(horizontal: 4),
       decoration: pw.BoxDecoration(
-        border: pw.Border.all(color: PdfColors.grey300),
-        borderRadius: const pw.BorderRadius.all(pw.Radius.circular(8)),
+        color: PdfColors.grey200,
+        borderRadius: const pw.BorderRadius.all(pw.Radius.circular(9)),
       ),
-      child: pw.Column(
-        crossAxisAlignment: pw.CrossAxisAlignment.start,
+      child: pw.Stack(
+        alignment: pw.Alignment.centerLeft,
         children: [
-          pw.Text('RESUMEN FINANCIERO',
-              style: pw.TextStyle(fontSize: 13, fontWeight: pw.FontWeight.bold)),
-          pw.SizedBox(height: 8),
-          pw.Row(
-            mainAxisAlignment: pw.MainAxisAlignment.spaceEvenly,
-            children: [
-              _summaryCard('Números Vendidos', '$vendidos / ${rifa.cantidadNumeros} ($pct%)', PdfColors.blue),
-              _summaryCard('Disponibles', '$disponibles', PdfColors.grey600),
-            ],
+          pw.Container(
+            width: pct * 4.35,
+            height: 14,
+            decoration: pw.BoxDecoration(
+              gradient: pw.LinearGradient(
+                colors: [PdfColor.fromInt(_gold), PdfColor.fromInt(0xFF8B6914)],
+                begin: pw.Alignment.centerLeft,
+                end: pw.Alignment.centerRight,
+              ),
+              borderRadius: const pw.BorderRadius.all(pw.Radius.circular(7)),
+            ),
           ),
-          pw.SizedBox(height: 8),
-          pw.Row(
-            mainAxisAlignment: pw.MainAxisAlignment.spaceEvenly,
-            children: [
-              _summaryCard('Pagados', '${pagados.length}', PdfColors.green700),
-              _summaryCard('Abonados', '${abonados.length}', PdfColors.orange700),
-              _summaryCard('Pendientes', '${pendientes.length}', PdfColors.red700),
-            ],
-          ),
-          pw.SizedBox(height: 12),
-          pw.Divider(),
-          pw.SizedBox(height: 8),
-          pw.Row(
-            mainAxisAlignment: pw.MainAxisAlignment.spaceEvenly,
-            children: [
-              _summaryCard('Recaudado', '\$${NumberFormat('#,###').format(recaudado)}', PdfColors.green700),
-              _summaryCard('Por Cobrar', '\$${NumberFormat('#,###').format(porCobrar)}', PdfColors.orange700),
-              _summaryCard('Potencial', '\$${NumberFormat('#,###').format(recaudado + porCobrar)}', PdfColors.blue),
-            ],
+          pw.Positioned.fill(
+            child: pw.Center(
+              child: pw.Text('${pct.toStringAsFixed(0)}% vendidos',
+                  style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold,
+                      color: pct > 40 ? PdfColors.white : PdfColors.black)),
+            ),
           ),
         ],
       ),
     );
   }
 
-  pw.Widget _summaryCard(String label, String value, PdfColor color) {
-    return pw.Column(
-      children: [
-        pw.Container(
-          width: 90,
-          padding: const pw.EdgeInsets.symmetric(vertical: 8, horizontal: 8),
-          decoration: pw.BoxDecoration(
-            color: PdfColors.grey100,
-            borderRadius: const pw.BorderRadius.all(pw.Radius.circular(6)),
-          ),
-          child: pw.Column(
-            children: [
-              pw.Text(value,
-                  style: pw.TextStyle(fontSize: 13, fontWeight: pw.FontWeight.bold, color: color)),
-              pw.SizedBox(height: 2),
-              pw.Text(label,
-                  style: pw.TextStyle(fontSize: 7, color: PdfColors.grey600)),
-            ],
-          ),
-        ),
-      ],
+  pw.Widget _summaryCard(String label, String value, String badge, PdfColor color) {
+    return pw.Container(
+      width: 100,
+      padding: const pw.EdgeInsets.symmetric(vertical: 8, horizontal: 6),
+      decoration: pw.BoxDecoration(
+        color: PdfColors.grey50,
+        borderRadius: const pw.BorderRadius.all(pw.Radius.circular(8)),
+        border: pw.Border.all(color: PdfColors.grey300, width: 0.5),
+      ),
+      child: pw.Column(
+        children: [
+          if (badge.isNotEmpty) ...[
+            pw.Container(
+              padding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: pw.BoxDecoration(
+                color: color,
+                borderRadius: const pw.BorderRadius.all(pw.Radius.circular(4)),
+              ),
+              child: pw.Text(badge, style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold, color: PdfColors.white)),
+            ),
+            pw.SizedBox(height: 4),
+          ],
+          pw.Text(value, style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold, color: color)),
+          pw.SizedBox(height: 2),
+          pw.Text(label, style: pw.TextStyle(fontSize: 6, color: PdfColors.grey600)),
+        ],
+      ),
     );
   }
 
   pw.Widget _buildTable(List<Participante> participantes, Rifa rifa) {
     participantes.sort((a, b) => b.fechaRegistro.compareTo(a.fechaRegistro));
+
+    final headerDecoration = pw.BoxDecoration(
+      gradient: pw.LinearGradient(
+        colors: [PdfColor.fromInt(_navy), PdfColor.fromInt(0xFF2C3E6B)],
+        begin: pw.Alignment.centerLeft,
+        end: pw.Alignment.centerRight,
+      ),
+      borderRadius: const pw.BorderRadius.all(pw.Radius.circular(4)),
+    );
 
     return pw.Column(
       crossAxisAlignment: pw.CrossAxisAlignment.start,
@@ -197,53 +242,101 @@ class ReportService {
         pw.Text('DETALLE DE PARTICIPANTES',
             style: pw.TextStyle(fontSize: 13, fontWeight: pw.FontWeight.bold)),
         pw.SizedBox(height: 8),
-        pw.TableHelper.fromTextArray(
-          headerStyle: pw.TextStyle(fontSize: 7, fontWeight: pw.FontWeight.bold, color: PdfColors.white),
-          headerDecoration: pw.BoxDecoration(
-            color: PdfColor.fromInt(0xFFFFD700),
-            borderRadius: const pw.BorderRadius.all(pw.Radius.circular(4)),
-          ),
-          cellStyle: pw.TextStyle(fontSize: 7),
-          rowDecoration: pw.BoxDecoration(
-            border: pw.Border(bottom: pw.BorderSide(color: PdfColors.grey300, width: 0.5)),
-          ),
-          headers: ['#', 'Nombre', 'WhatsApp', 'Números', 'Estado', 'Pagado', 'Total', 'Abonos'],
-          data: participantes.asMap().entries.map((e) {
-            final p = e.value;
-            final idx = e.key + 1;
-            final total = p.numeros.length * rifa.precioNumero;
-            final estado = p.estadoPago == EstadoPago.pagado ? 'PAGADO'
-                : p.estadoPago == EstadoPago.abonado ? 'ABONADO' : 'PENDIENTE';
-            return [
-              '$idx',
-              p.nombre,
-              p.whatsapp,
-              p.numeros.join(', '),
-              estado,
-              '\$${NumberFormat('#,###').format(p.totalPagado)}',
-              '\$${NumberFormat('#,###').format(total)}',
-              '${p.abonos.length}',
-            ];
-          }).toList(),
-        ),
+        _buildDataTable(participantes, rifa, headerDecoration),
       ],
     );
   }
 
-  pw.Widget _buildFooter() {
-    return pw.Column(
+  pw.Widget _buildDataTable(List<Participante> participantes, Rifa rifa, pw.BoxDecoration headerDecoration) {
+    final cellStyle = pw.TextStyle(fontSize: 7);
+    final altColor = PdfColor.fromInt(_accent);
+
+    return pw.Table(
+      border: pw.TableBorder.all(color: PdfColors.grey300, width: 0.5),
+      columnWidths: const {
+        0: pw.FlexColumnWidth(0.5),
+        1: pw.FlexColumnWidth(3),
+        2: pw.FlexColumnWidth(2),
+        3: pw.FlexColumnWidth(2),
+        4: pw.FlexColumnWidth(1.2),
+        5: pw.FlexColumnWidth(1.2),
+        6: pw.FlexColumnWidth(1.2),
+        7: pw.FlexColumnWidth(0.8),
+      },
       children: [
-        pw.SizedBox(height: 40),
-        pw.Divider(),
-        pw.SizedBox(height: 8),
-        pw.Row(
-          mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-          children: [
-            pw.Text('Generado el ${DateFormat('dd/MM/yyyy HH:mm').format(DateTime.now())}'),
-            pw.Text('RifaDorada'),
-          ],
+        pw.TableRow(
+          decoration: headerDecoration,
+          children: ['#', 'Nombre', 'WhatsApp', 'Números', 'Estado', 'Pagado', 'Total', 'Abonos']
+              .map((h) => pw.Padding(
+                    padding: const pw.EdgeInsets.all(4),
+                    child: pw.Text(h, style: pw.TextStyle(fontSize: 7, fontWeight: pw.FontWeight.bold, color: PdfColors.white)),
+                  ))
+              .toList(),
         ),
+        ...participantes.asMap().entries.map((e) {
+          final p = e.value;
+          final idx = e.key + 1;
+          final total = p.numeros.length * rifa.precioNumero;
+          final isPagado = p.estadoPago == EstadoPago.pagado;
+          final isAbonado = p.estadoPago == EstadoPago.abonado;
+          final estado = isPagado ? 'PAGADO' : isAbonado ? 'ABONADO' : 'PENDIENTE';
+          final estadoColor = isPagado ? PdfColors.green700 : isAbonado ? PdfColors.orange700 : PdfColors.red700;
+          final rowColor = e.key.isEven ? null : altColor;
+
+          return pw.TableRow(
+            decoration: pw.BoxDecoration(
+              color: rowColor,
+              border: pw.Border(bottom: pw.BorderSide(color: PdfColors.grey300, width: 0.3)),
+            ),
+            children: [
+              _cell('$idx', pw.Alignment.center, cellStyle),
+              _cell(p.nombre, pw.Alignment.centerLeft, cellStyle),
+              _cell(p.whatsapp, pw.Alignment.centerLeft, cellStyle),
+              _cell(p.numeros.join(', '), pw.Alignment.centerLeft, cellStyle),
+              pw.Padding(
+                padding: const pw.EdgeInsets.all(3),
+                child: pw.Text(estado, style: pw.TextStyle(fontSize: 7, fontWeight: pw.FontWeight.bold, color: estadoColor)),
+              ),
+              _cell('\$${NumberFormat('#,###').format(p.totalPagado)}', pw.Alignment.centerRight, cellStyle),
+              _cell('\$${NumberFormat('#,###').format(total)}', pw.Alignment.centerRight, cellStyle),
+              _cell('${p.abonos.length}', pw.Alignment.center, cellStyle),
+            ],
+          );
+        }),
       ],
+    );
+  }
+
+  pw.Padding _cell(String text, pw.Alignment align, pw.TextStyle style) {
+    return pw.Padding(
+      padding: const pw.EdgeInsets.all(3),
+      child: pw.Text(text, style: style, textAlign: pw.TextAlign.left),
+    );
+  }
+
+  pw.Widget _buildFooter(pw.Context context) {
+    return pw.Container(
+      padding: const pw.EdgeInsets.only(top: 6),
+      decoration: const pw.BoxDecoration(
+        border: pw.Border(top: pw.BorderSide(color: PdfColors.grey300, width: 0.5)),
+      ),
+      child: pw.Row(
+        mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+        children: [
+          pw.Text(
+            'Generado el ${DateFormat('dd/MM/yyyy HH:mm').format(DateTime.now())}',
+            style: pw.TextStyle(fontSize: 7, color: PdfColors.grey600),
+          ),
+          pw.Text(
+            'RifaDorada',
+            style: pw.TextStyle(fontSize: 7, color: PdfColor.fromInt(_navy), fontWeight: pw.FontWeight.bold),
+          ),
+          pw.Text(
+            'Pág. ${context.pageNumber} de ${context.pagesCount}',
+            style: pw.TextStyle(fontSize: 7, color: PdfColors.grey600),
+          ),
+        ],
+      ),
     );
   }
 
