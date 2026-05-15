@@ -43,9 +43,11 @@ class ReportService {
         header: (context) => _buildHeader(rifa, organizacion, logoBytes),
         footer: (context) => _buildFooter(context),
         build: (context) => [
-          pw.SizedBox(height: 20),
+          pw.SizedBox(height: 16),
+          _buildInfoRow(rifa),
+          pw.SizedBox(height: 16),
           _buildSummary(participantes, rifa),
-          pw.SizedBox(height: 24),
+          pw.SizedBox(height: 16),
           _buildTable(participantes, rifa),
         ],
       ),
@@ -116,6 +118,33 @@ class ReportService {
     );
   }
 
+  pw.Widget _buildInfoRow(Rifa rifa) {
+    return pw.Row(
+      mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+      children: [
+        _infoBadge('Tipo', rifa.tipoRifa),
+        _infoBadge('Valor', '\$${NumberFormat('#,###').format(rifa.precioNumero)}'),
+        _infoBadge('Total Números', '${rifa.cantidadNumeros}'),
+        _infoBadge('Creada', DateFormat('dd/MM/yyyy').format(rifa.fechaCreacion)),
+        if (rifa.fechaSorteo != null)
+          _infoBadge('Sorteo', DateFormat('dd/MM/yyyy').format(rifa.fechaSorteo!)),
+      ],
+    );
+  }
+
+  pw.Widget _infoBadge(String label, String value) {
+    return pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.start,
+      children: [
+        pw.Text(label.toUpperCase(),
+            style: pw.TextStyle(fontSize: 6, color: PdfColors.grey600, letterSpacing: 1)),
+        pw.SizedBox(height: 2),
+        pw.Text(value,
+            style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold, color: PdfColor.fromInt(_navy))),
+      ],
+    );
+  }
+
   pw.Widget _buildSummary(List<Participante> participantes, Rifa rifa) {
     final pagados = participantes.where((p) => p.estaPagado).toList();
     final abonados = participantes.where((p) => p.estaAbonado && !p.estaPagado).toList();
@@ -138,22 +167,22 @@ class ReportService {
         _progressBar(pct),
         pw.SizedBox(height: 10),
         pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceEvenly, children: [
-          _summaryCard('Vendidos', '$vendidos / ${rifa.cantidadNumeros}', '${pct.toStringAsFixed(0)}%', PdfColors.blue800),
-          _summaryCard('Disponibles', '$disponibles', '', PdfColors.grey600),
+          _summaryCard('Vendidos', '$vendidos / ${rifa.cantidadNumeros}', PdfColors.blue800),
+          _summaryCard('Disponibles', '$disponibles', PdfColors.grey600),
         ]),
         pw.SizedBox(height: 6),
         pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceEvenly, children: [
-          _summaryCard('Pagados', '${pagados.length}', '', PdfColors.green700),
-          _summaryCard('Abonados', '${abonados.length}', '', PdfColors.orange700),
-          _summaryCard('Pendientes', '${pendientes.length}', '', PdfColors.red700),
+          _summaryCard('Pagados', '${pagados.length}', PdfColors.green700),
+          _summaryCard('Abonados', '${abonados.length}', PdfColors.orange700),
+          _summaryCard('Pendientes', '${pendientes.length}', PdfColors.red700),
         ]),
         pw.SizedBox(height: 10),
         pw.Divider(color: PdfColors.grey300),
         pw.SizedBox(height: 8),
         pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceEvenly, children: [
-          _summaryCard('Recaudado', '\$${NumberFormat('#,###').format(recaudado)}', '', PdfColors.green700),
-          _summaryCard('Por Cobrar', '\$${NumberFormat('#,###').format(porCobrar)}', '', PdfColors.orange700),
-          _summaryCard('Potencial', '\$${NumberFormat('#,###').format(recaudado + porCobrar)}', '', PdfColors.blue800),
+          _summaryCard('Recaudado', '\$${NumberFormat('#,###').format(recaudado)}', PdfColors.green700),
+          _summaryCard('Por Cobrar', '\$${NumberFormat('#,###').format(porCobrar)}', PdfColors.orange700),
+          _summaryCard('Potencial', '\$${NumberFormat('#,###').format(recaudado + porCobrar)}', PdfColors.blue800),
         ]),
       ],
     );
@@ -194,10 +223,10 @@ class ReportService {
     );
   }
 
-  pw.Widget _summaryCard(String label, String value, String badge, PdfColor color) {
+  pw.Widget _summaryCard(String label, String value, PdfColor color) {
     return pw.Container(
       width: 100,
-      padding: const pw.EdgeInsets.symmetric(vertical: 8, horizontal: 6),
+      padding: const pw.EdgeInsets.symmetric(vertical: 10, horizontal: 6),
       decoration: pw.BoxDecoration(
         color: PdfColors.grey50,
         borderRadius: const pw.BorderRadius.all(pw.Radius.circular(8)),
@@ -205,19 +234,8 @@ class ReportService {
       ),
       child: pw.Column(
         children: [
-          if (badge.isNotEmpty) ...[
-            pw.Container(
-              padding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-              decoration: pw.BoxDecoration(
-                color: color,
-                borderRadius: const pw.BorderRadius.all(pw.Radius.circular(4)),
-              ),
-              child: pw.Text(badge, style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold, color: PdfColors.white)),
-            ),
-            pw.SizedBox(height: 4),
-          ],
-          pw.Text(value, style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold, color: color)),
-          pw.SizedBox(height: 2),
+          pw.Text(value, style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold, color: color)),
+          pw.SizedBox(height: 3),
           pw.Text(label, style: pw.TextStyle(fontSize: 6, color: PdfColors.grey600)),
         ],
       ),
@@ -310,7 +328,10 @@ class ReportService {
   pw.Padding _cell(String text, pw.Alignment align, pw.TextStyle style) {
     return pw.Padding(
       padding: const pw.EdgeInsets.all(3),
-      child: pw.Text(text, style: style, textAlign: pw.TextAlign.left),
+      child: pw.Container(
+        alignment: align,
+        child: pw.Text(text, style: style),
+      ),
     );
   }
 
