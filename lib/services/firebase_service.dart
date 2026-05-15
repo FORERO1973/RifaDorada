@@ -474,18 +474,28 @@ class FirebaseService {
     final pendientes = participantes.where((p) => !p.estaAbonado && !p.estaPagado);
     final totalRecaudado = pagados.fold(0.0, (s, p) => s + p.totalPagado) +
         abonados.fold(0.0, (s, p) => s + p.totalPagado);
-    final totalPendiente = pendientes.fold(0.0, (s, p) => s + p.numeros.length * precio);
+    final totalPendiente = pendientes.fold(0.0, (s, p) => s + p.numeros.length * precio)
+        + abonados.fold(0.0, (s, p) => s + (p.numeros.length * precio - p.totalPagado));
+
+    final vendidos = participantes.fold(0, (s, p) => s + p.numeros.length);
+    final disponibles = (rifa?.cantidadNumeros ?? 0) - vendidos;
+    final pct = (rifa?.cantidadNumeros ?? 0) > 0
+        ? (vendidos * 100 / rifa!.cantidadNumeros).toStringAsFixed(0)
+        : '0';
 
     final buffer = StringBuffer();
     buffer.write('\uFEFF');
     buffer.writeln('"REPORTE DE RIFA: $nombreRifa"');
     buffer.writeln('"Generado:", "${DateFormat('dd/MM/yyyy HH:mm').format(DateTime.now())}"');
+    buffer.writeln('"Números vendidos:", "$vendidos / ${rifa?.cantidadNumeros ?? 0} ($pct%)"');
+    buffer.writeln('"Números disponibles:", "$disponibles"');
     buffer.writeln('"Total participantes:", "${participantes.length}"');
     buffer.writeln('"Pagados:", "${pagados.length}"');
     buffer.writeln('"Abonados:", "${abonados.length}"');
     buffer.writeln('"Pendientes:", "${pendientes.length}"');
     buffer.writeln('"Total recaudado:", "${totalRecaudado.toStringAsFixed(0)}"');
     buffer.writeln('"Saldo pendiente:", "${totalPendiente.toStringAsFixed(0)}"');
+    buffer.writeln('"Potencial total:", "${(totalRecaudado + totalPendiente).toStringAsFixed(0)}"');
     buffer.writeln('');
     buffer.writeln('Nombre,WhatsApp,Ciudad,Documento,Números,Estado,Total Pagado,Valor Total,Abonos,Fecha Registro');
     

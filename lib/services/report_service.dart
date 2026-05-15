@@ -109,9 +109,16 @@ class ReportService {
     final pagados = participantes.where((p) => p.estaPagado).toList();
     final abonados = participantes.where((p) => p.estaAbonado && !p.estaPagado).toList();
     final pendientes = participantes.where((p) => !p.estaAbonado && !p.estaPagado).toList();
+
     final recaudado = pagados.fold<double>(0, (s, p) => s + p.totalPagado) +
         abonados.fold<double>(0, (s, p) => s + p.totalPagado);
-    final porCobrar = pendientes.fold<double>(0, (s, p) => s + p.numeros.length * rifa.precioNumero);
+
+    final porCobrar = pendientes.fold<double>(0, (s, p) => s + p.numeros.length * rifa.precioNumero)
+        + abonados.fold<double>(0, (s, p) => s + (p.numeros.length * rifa.precioNumero - p.totalPagado));
+
+    final vendidos = participantes.fold<int>(0, (s, p) => s + p.numeros.length);
+    final disponibles = rifa.cantidadNumeros - vendidos;
+    final pct = rifa.cantidadNumeros > 0 ? (vendidos * 100 / rifa.cantidadNumeros).toStringAsFixed(0) : '0';
 
     return pw.Container(
       padding: const pw.EdgeInsets.all(16),
@@ -124,17 +131,26 @@ class ReportService {
         children: [
           pw.Text('RESUMEN FINANCIERO',
               style: pw.TextStyle(fontSize: 13, fontWeight: pw.FontWeight.bold)),
-          pw.SizedBox(height: 12),
+          pw.SizedBox(height: 8),
           pw.Row(
             mainAxisAlignment: pw.MainAxisAlignment.spaceEvenly,
             children: [
-              _summaryCard('Participantes', '${participantes.length}', PdfColors.blue),
+              _summaryCard('Números Vendidos', '$vendidos / ${rifa.cantidadNumeros} ($pct%)', PdfColors.blue),
+              _summaryCard('Disponibles', '$disponibles', PdfColors.grey600),
+            ],
+          ),
+          pw.SizedBox(height: 8),
+          pw.Row(
+            mainAxisAlignment: pw.MainAxisAlignment.spaceEvenly,
+            children: [
               _summaryCard('Pagados', '${pagados.length}', PdfColors.green700),
               _summaryCard('Abonados', '${abonados.length}', PdfColors.orange700),
               _summaryCard('Pendientes', '${pendientes.length}', PdfColors.red700),
             ],
           ),
           pw.SizedBox(height: 12),
+          pw.Divider(),
+          pw.SizedBox(height: 8),
           pw.Row(
             mainAxisAlignment: pw.MainAxisAlignment.spaceEvenly,
             children: [
