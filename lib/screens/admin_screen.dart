@@ -7,7 +7,6 @@ import '../providers/rifa_provider.dart';
 import '../models/rifa.dart';
 import '../services/firebase_service.dart';
 import '../services/report_service.dart';
-import '../models/app_config.dart';
 import 'login_screen.dart';
 import 'sales_list_screen.dart';
 
@@ -445,12 +444,15 @@ Widget _buildStatsSection(Map<String, dynamic> stats, Rifa rifa) {
               Navigator.pop(ctx);
               final config = await FirebaseService.instance.getAppConfig();
               final participantes = await FirebaseService.instance.getParticipantesOnce(rifa.id);
+              final numerosMap = await FirebaseService.instance.getNumeros(rifa.id);
+              final numerosEstado = numerosMap.map((k, v) => MapEntry(k, v.estado.name));
               if (participantes.isEmpty) return;
               try {
                 await ReportService.instance.generatePdfReport(
                   rifa: rifa,
                   participantes: participantes,
                   organizacion: config?.organizacion,
+                  numerosEstado: numerosEstado,
                 );
                 if (context.mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(

@@ -21,6 +21,7 @@ class ReportService {
     required Rifa rifa,
     required List<Participante> participantes,
     required String? organizacion,
+    Map<String, String>? numerosEstado,
   }) async {
     final pdf = pw.Document();
 
@@ -48,6 +49,10 @@ class ReportService {
           pw.SizedBox(height: 16),
           _buildSummary(participantes, rifa),
           pw.SizedBox(height: 16),
+          if (numerosEstado != null) ...[
+            _buildNumeroGrid(rifa, numerosEstado),
+            pw.SizedBox(height: 16),
+          ],
           _buildTable(participantes, rifa),
         ],
       ),
@@ -262,6 +267,75 @@ class ReportService {
         pw.SizedBox(height: 8),
         _buildDataTable(participantes, rifa, headerDecoration),
       ],
+    );
+  }
+
+  pw.Widget _buildNumeroGrid(Rifa rifa, Map<String, String> estados) {
+    final cols = rifa.tipoRifa == '3 cifras' ? 8 : 10;
+    final digitos = rifa.tipoRifa == '3 cifras' ? 3 : 2;
+    final total = rifa.cantidadNumeros;
+    final rows = (total / cols).ceil();
+
+    final verde = PdfColors.green800;
+    final amarillo = PdfColor.fromInt(0xFFFBC02D);
+    final azul = PdfColors.blue700;
+    final gris = PdfColors.grey200;
+
+    return pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.start,
+      children: [
+        pw.Text('ESTADO DE NÚMEROS',
+            style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold)),
+        pw.SizedBox(height: 6),
+        pw.Row(mainAxisAlignment: pw.MainAxisAlignment.start, children: [
+          _gridLegend(verde, 'Disponible'),
+          pw.SizedBox(width: 10),
+          _gridLegend(amarillo, 'Reservado'),
+          pw.SizedBox(width: 10),
+          _gridLegend(azul, 'Pagado'),
+        ]),
+        pw.SizedBox(height: 8),
+        pw.Table(
+          border: pw.TableBorder.all(color: PdfColors.grey300, width: 0.3),
+          columnWidths: {for (var i = 0; i < cols; i++) i: const pw.FlexColumnWidth(1)},
+          children: [
+            for (var r = 0; r < rows; r++) ...[
+              pw.TableRow(
+                children: [
+                  for (var c = 0; c < cols; c++) ...[
+                    () {
+                      final idx = r * cols + c;
+                      if (idx >= total) return _gridCell('', gris, PdfColors.grey300);
+                      final numStr = idx.toString().padLeft(digitos, '0');
+                      final est = estados[numStr];
+                      final color = est == 'pagado' ? azul : est == 'reservado' ? amarillo : verde;
+                      final textColor = est == 'reservado' ? PdfColors.black : PdfColors.white;
+                      return _gridCell(numStr, color, textColor);
+                    }(),
+                  ],
+                ],
+              ),
+            ],
+          ],
+        ),
+      ],
+    );
+  }
+
+  pw.Widget _gridLegend(PdfColor color, String label) {
+    return pw.Row(children: [
+      pw.Container(width: 10, height: 10, decoration: pw.BoxDecoration(color: color, borderRadius: const pw.BorderRadius.all(pw.Radius.circular(2)))),
+      pw.SizedBox(width: 3),
+      pw.Text(label, style: pw.TextStyle(fontSize: 7, color: PdfColors.grey700)),
+    ]);
+  }
+
+  pw.Widget _gridCell(String text, PdfColor bg, PdfColor fg) {
+    return pw.Container(
+      padding: const pw.EdgeInsets.all(2),
+      color: bg,
+      alignment: pw.Alignment.center,
+      child: pw.Text(text, style: pw.TextStyle(fontSize: 6, color: fg, fontWeight: pw.FontWeight.bold)),
     );
   }
 
