@@ -500,17 +500,16 @@ Map<String, dynamic> getEstadisticas() {
   }
 
 
-  Future<void> exportarDatosCSV() async {
-    if (_rifaSeleccionada == null) return;
+  Future<void> exportarDatosCSV({String? rifaId, String? nombreRifa}) async {
+    final rid = rifaId ?? _rifaSeleccionada?.id;
+    final rName = nombreRifa ?? _rifaSeleccionada?.nombre ?? 'Rifa';
+    if (rid == null) return;
 
     try {
       _isLoading = true;
       notifyListeners();
 
-      final csvContent = await _firebaseService.exportarDatosCSV(
-        _rifaSeleccionada!.id,
-        _rifaSeleccionada!.nombre,
-      );
+      final csvContent = await _firebaseService.exportarDatosCSV(rid, rName);
 
       if (csvContent.isEmpty) {
         _error = 'No hay participantes registrados en esta rifa para exportar.';
@@ -518,9 +517,8 @@ Map<String, dynamic> getEstadisticas() {
       }
 
       final directory = await getTemporaryDirectory();
-      // Nombre de archivo más profesional con fecha
       final dateStr = DateFormat('yyyyMMdd_HHmm').format(DateTime.now());
-      final fileName = 'Reporte_${_rifaSeleccionada!.nombre.replaceAll(' ', '_')}_$dateStr.csv';
+      final fileName = 'Reporte_${rName.replaceAll(' ', '_')}_$dateStr.csv';
       final filePath = '${directory.path}/$fileName';
       
       final file = File(filePath);
@@ -528,7 +526,7 @@ Map<String, dynamic> getEstadisticas() {
 
       await Share.shareXFiles(
         [XFile(filePath, mimeType: 'text/csv')],
-        subject: 'Reporte de Rifa: ${_rifaSeleccionada!.nombre}',
+        subject: 'Reporte de Rifa: $rName',
       );
     } catch (e) {
       _error = 'Error crítico al exportar: $e';

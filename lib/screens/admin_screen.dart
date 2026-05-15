@@ -436,7 +436,7 @@ Widget _buildStatsSection(Map<String, dynamic> stats, Rifa rifa) {
         content: const Text('Selecciona el formato:'),
         actions: [
           TextButton.icon(
-            onPressed: () { Navigator.pop(ctx); provider.exportarDatosCSV(); },
+            onPressed: () { Navigator.pop(ctx); provider.exportarDatosCSV(rifaId: rifa.id, nombreRifa: rifa.nombre); },
             icon: const Icon(Icons.table_chart_outlined, size: 18),
             label: const Text('CSV (Excel)'),
           ),
