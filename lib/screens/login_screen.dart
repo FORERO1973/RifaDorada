@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:provider/provider.dart';
 import '../config/theme.dart';
-import '../services/firebase_service.dart';
+import '../providers/auth_provider.dart';
+import 'register_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -14,8 +16,25 @@ class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
-  bool _isLoading = false;
   bool _obscurePassword = true;
+  bool _shouldCheckRegister = true;
+  bool _showRegisterOption = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkRegisterOption();
+  }
+
+  Future<void> _checkRegisterOption() async {
+    if (!_shouldCheckRegister) return;
+    _shouldCheckRegister = false;
+    final auth = context.read<AuthProvider>();
+    final anyUser = await auth.checkAnyUserExists();
+    if (mounted) {
+      setState(() => _showRegisterOption = !anyUser);
+    }
+  }
 
   @override
   void dispose() {
@@ -41,13 +60,46 @@ class _LoginScreenState extends State<LoginScreen> {
                   const SizedBox(height: 48),
                   _buildWelcomeText(),
                   const SizedBox(height: 32),
+                  Consumer<AuthProvider>(
+                    builder: (context, auth, _) {
+                      if (auth.error != null) {
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 16),
+                          child: Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: AppTheme.errorColor.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: AppTheme.errorColor.withValues(alpha: 0.3)),
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(Icons.error_outline, color: AppTheme.errorColor, size: 20),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(auth.error!, style: const TextStyle(color: AppTheme.errorColor, fontSize: 13)),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      }
+                      return const SizedBox.shrink();
+                    },
+                  ),
                   _buildEmailField(),
                   const SizedBox(height: 16),
                   _buildPasswordField(),
                   const SizedBox(height: 24),
-                  _buildLoginButton(),
-                  const SizedBox(height: 24),
-                  _buildDemoCredentials(),
+                  Consumer<AuthProvider>(
+                    builder: (context, auth, _) {
+                      return _buildLoginButton(auth.isLoading);
+                    },
+                  ),
+                  if (_showRegisterOption) ...[
+                    const SizedBox(height: 24),
+                    _buildRegisterOption(),
+                  ],
                 ],
               ),
             ),
@@ -63,7 +115,6 @@ class _LoginScreenState extends State<LoginScreen> {
         Stack(
           alignment: Alignment.center,
           children: [
-            // Glowing aura
             Container(
               width: 160,
               height: 160,
@@ -83,13 +134,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 ],
               ),
             ),
-            // Logo Image
-            Image.asset(
-              'assets/logo/logo.png',
-              width: 200,
-              height: 200,
-              fit: BoxFit.contain,
-            ),
+            Image.asset('assets/logo/logo.png', width: 200, height: 200, fit: BoxFit.contain),
           ],
         ),
         const SizedBox(height: 16),
@@ -134,7 +179,6 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-
   Widget _buildEmailField() {
     return TextFormField(
       controller: _emailController,
@@ -142,17 +186,11 @@ class _LoginScreenState extends State<LoginScreen> {
       decoration: InputDecoration(
         labelText: 'Correo electrónico',
         prefixIcon: const Icon(Icons.email),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
       ),
       validator: (value) {
-        if (value == null || value.isEmpty) {
-          return 'Por favor ingrese su correo';
-        }
-        if (!value.contains('@')) {
-          return 'Ingrese un correo válido';
-        }
+        if (value == null || value.isEmpty) return 'Por favor ingrese su correo';
+        if (!value.contains('@')) return 'Ingrese un correo válido';
         return null;
       },
     );
@@ -166,32 +204,19 @@ class _LoginScreenState extends State<LoginScreen> {
         labelText: 'Contraseña',
         prefixIcon: const Icon(Icons.lock),
         suffixIcon: IconButton(
-          icon: Icon(
-            _obscurePassword ? Icons.visibility : Icons.visibility_off,
-          ),
-          onPressed: () {
-            setState(() {
-              _obscurePassword = !_obscurePassword;
-            });
-          },
+          icon: Icon(_obscurePassword ? Icons.visibility : Icons.visibility_off),
+          onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
         ),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
       ),
       validator: (value) {
-        if (value == null || value.isEmpty) {
-          return 'Por favor ingrese su contraseña';
-        }
-        if (value.length < 6) {
-          return 'La contraseña debe tener al menos 6 caracteres';
-        }
+        if (value == null || value.isEmpty) return 'Por favor ingrese su contraseña';
         return null;
       },
     );
   }
 
-  Widget _buildLoginButton() {
+  Widget _buildLoginButton(bool isLoading) {
     return Container(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(16),
@@ -204,114 +229,57 @@ class _LoginScreenState extends State<LoginScreen> {
         ],
       ),
       child: ElevatedButton(
-        onPressed: _isLoading ? null : _login,
+        onPressed: isLoading ? null : _login,
         style: ElevatedButton.styleFrom(
           padding: const EdgeInsets.symmetric(vertical: 20),
           backgroundColor: AppTheme.primaryColor,
           foregroundColor: AppTheme.backgroundColor,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           elevation: 0,
         ),
-        child: _isLoading
+        child: isLoading
             ? const SizedBox(
                 height: 24,
                 width: 24,
-                child: CircularProgressIndicator(
-                  strokeWidth: 3,
-                  color: AppTheme.backgroundColor,
-                ),
+                child: CircularProgressIndicator(strokeWidth: 3, color: AppTheme.backgroundColor),
               )
             : Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   const Icon(Icons.login_rounded, weight: 700),
                   const SizedBox(width: 12),
-                  Text(
-                    'INICIAR SESIÓN',
-                    style: GoogleFonts.outfit(
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: 1,
-                    ),
-                  ),
+                  Text('INICIAR SESIÓN', style: GoogleFonts.outfit(fontWeight: FontWeight.w900, letterSpacing: 1)),
                 ],
               ),
       ),
     );
   }
 
-
-  Widget _buildDemoCredentials() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppTheme.surfaceColor,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppTheme.dividerColor),
-      ),
-      child: Column(
-        children: [
-          const Text(
-            'Credenciales de Demo',
-            style: TextStyle(fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Email: admin@rifadorada.com',
-            style: Theme.of(context).textTheme.bodySmall,
-          ),
-          Text(
-            'Contraseña: admin123',
-            style: Theme.of(context).textTheme.bodySmall,
-          ),
-        ],
-      ),
+  Widget _buildRegisterOption() {
+    return Column(
+      children: [
+        Text('¿No tienes una cuenta?', style: TextStyle(color: AppTheme.textSecondary, fontSize: 13)),
+        const SizedBox(height: 8),
+        TextButton.icon(
+          onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const RegisterScreen())),
+          icon: const Icon(Icons.person_add_rounded),
+          label: const Text('CREAR CUENTA', style: TextStyle(fontWeight: FontWeight.bold)),
+        ),
+      ],
     );
   }
 
   Future<void> _login() async {
     if (!_formKey.currentState!.validate()) return;
 
-    setState(() => _isLoading = true);
+    final auth = context.read<AuthProvider>();
+    final success = await auth.login(
+      _emailController.text.trim(),
+      _passwordController.text,
+    );
 
-    try {
-      final success = await FirebaseService.instance.loginAdmin(
-        _emailController.text.trim(),
-        _passwordController.text,
-      );
-
-      if (mounted) {
-        if (success) {
-          Navigator.pop(context);
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('¡Bienvenido al panel de administración!'),
-              backgroundColor: AppTheme.secondaryColor,
-            ),
-          );
-        } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Credenciales incorrectas'),
-              backgroundColor: AppTheme.errorColor,
-            ),
-          );
-        }
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error: $e'),
-            backgroundColor: AppTheme.errorColor,
-          ),
-        );
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
+    if (mounted && success) {
+      // AuthGateway will handle navigation via auth state listener
     }
   }
 }

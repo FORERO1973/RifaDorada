@@ -10,13 +10,15 @@ class Rifa {
   final DateTime? fechaSorteo;
   final String? numeroGanador;
   
-  // Nuevos campos
   final String? loteria;
   final String? diaSorteo;
   final List<String> imagenes;
   final String? responsable;
   final String? contactoResponsable;
   final String? organizacion;
+  final String? organizacionId;
+  final String? creadoPor;
+  final String? vendedorId;
 
   Rifa({
     required this.id,
@@ -35,6 +37,9 @@ class Rifa {
     this.responsable,
     this.contactoResponsable,
     this.organizacion,
+    this.organizacionId,
+    this.creadoPor,
+    this.vendedorId,
   });
 
   factory Rifa.fromMap(Map<String, dynamic> map, String id) {
@@ -59,6 +64,9 @@ class Rifa {
       responsable: map['responsable'],
       contactoResponsable: map['contactoResponsable'],
       organizacion: map['organizacion'],
+      organizacionId: map['organizacionId'],
+      creadoPor: map['creadoPor'],
+      vendedorId: map['vendedorId'],
     );
   }
 
@@ -79,6 +87,9 @@ class Rifa {
       'responsable': responsable,
       'contactoResponsable': contactoResponsable,
       'organizacion': organizacion,
+      'organizacionId': organizacionId,
+      'creadoPor': creadoPor,
+      'vendedorId': vendedorId,
     };
   }
 
@@ -99,6 +110,9 @@ class Rifa {
     String? responsable,
     String? contactoResponsable,
     String? organizacion,
+    String? organizacionId,
+    String? creadoPor,
+    String? vendedorId,
   }) {
     return Rifa(
       id: id ?? this.id,
@@ -117,6 +131,9 @@ class Rifa {
       responsable: responsable ?? this.responsable,
       contactoResponsable: contactoResponsable ?? this.contactoResponsable,
       organizacion: organizacion ?? this.organizacion,
+      organizacionId: organizacionId ?? this.organizacionId,
+      creadoPor: creadoPor ?? this.creadoPor,
+      vendedorId: vendedorId ?? this.vendedorId,
     );
   }
 

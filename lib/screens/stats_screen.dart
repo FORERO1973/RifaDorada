@@ -6,7 +6,6 @@ import 'package:google_fonts/google_fonts.dart';
 import '../config/theme.dart';
 import '../providers/rifa_provider.dart';
 import '../models/rifa.dart';
-import '../models/participante.dart';
 import '../config/constants.dart';
 
 class StatsScreen extends StatefulWidget {

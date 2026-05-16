@@ -89,6 +89,9 @@ class Participante {
   final List<Abono> abonos;
   final List<HistorialCambio> historial;
   final bool botNotified;
+  final String? organizacionId;
+  final String? creadoPor;
+  final String? vendedorId;
 
   Participante({
     required this.id,
@@ -105,6 +108,9 @@ class Participante {
     this.abonos = const [],
     this.historial = const [],
     this.botNotified = false,
+    this.organizacionId,
+    this.creadoPor,
+    this.vendedorId,
   });
 
   factory Participante.fromMap(Map<String, dynamic> map, String id) {
@@ -147,6 +153,9 @@ class Participante {
       abonos: abonosList,
       historial: historialList,
       botNotified: map['bot_notified'] ?? false,
+      organizacionId: map['organizacionId'],
+      creadoPor: map['creadoPor'],
+      vendedorId: map['vendedorId'],
     );
   }
 
@@ -179,6 +188,9 @@ class Participante {
       'abonos': abonosMap,
       'historial': historialMap,
       'bot_notified': botNotified,
+      'organizacionId': organizacionId,
+      'creadoPor': creadoPor,
+      'vendedorId': vendedorId,
     };
   }
 
@@ -197,6 +209,9 @@ class Participante {
     List<Abono>? abonos,
     List<HistorialCambio>? historial,
     bool? botNotified,
+    String? organizacionId,
+    String? creadoPor,
+    String? vendedorId,
   }) {
     return Participante(
       id: id ?? this.id,
@@ -213,6 +228,9 @@ class Participante {
       abonos: abonos ?? this.abonos,
       historial: historial ?? this.historial,
       botNotified: botNotified ?? this.botNotified,
+      organizacionId: organizacionId ?? this.organizacionId,
+      creadoPor: creadoPor ?? this.creadoPor,
+      vendedorId: vendedorId ?? this.vendedorId,
     );
   }
 

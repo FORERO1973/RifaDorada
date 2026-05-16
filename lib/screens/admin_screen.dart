@@ -3,12 +3,13 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../config/theme.dart';
 import '../config/constants.dart';
+import '../providers/auth_provider.dart';
 import '../providers/rifa_provider.dart';
 import '../models/rifa.dart';
 import '../services/firebase_service.dart';
 import '../services/report_service.dart';
-import 'login_screen.dart';
 import 'sales_list_screen.dart';
+import 'admin_users_screen.dart';
 
 class AdminScreen extends StatefulWidget {
   const AdminScreen({super.key});
@@ -64,7 +65,14 @@ class _AdminScreenState extends State<AdminScreen> {
         ),
         actions: [
           IconButton(
+            icon: const Icon(Icons.people_alt_rounded),
+            tooltip: 'Gestionar Usuarios',
+            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AdminUsersScreen())),
+          ),
+          const SizedBox(width: 4),
+          IconButton(
             icon: const Icon(Icons.logout),
+            tooltip: 'Cerrar Sesión',
             onPressed: () => _showLogoutDialog(context),
           ),
         ],
@@ -439,10 +447,11 @@ Widget _buildStatsSection(Map<String, dynamic> stats, Rifa rifa) {
             icon: const Icon(Icons.table_chart_outlined, size: 18),
             label: const Text('CSV (Excel)'),
           ),
-          ElevatedButton.icon(
+            ElevatedButton.icon(
             onPressed: () async {
               Navigator.pop(ctx);
-              final config = await FirebaseService.instance.getAppConfig();
+              final auth = context.read<AuthProvider>();
+              final config = await FirebaseService.instance.getAppConfig(organizacionId: auth.organizacionId);
               final participantes = await FirebaseService.instance.getParticipantesOnce(rifa.id);
               final numerosMap = await FirebaseService.instance.getNumeros(rifa.id);
               final numerosEstado = numerosMap.map((k, v) => MapEntry(k, v.estado.name));
@@ -489,13 +498,9 @@ Widget _buildStatsSection(Map<String, dynamic> stats, Rifa rifa) {
           ),
           ElevatedButton(
             onPressed: () async {
-              await FirebaseService.instance.logout();
+              await context.read<AuthProvider>().logout();
               if (context.mounted) {
                 Navigator.pop(context);
-                Navigator.pushReplacement(
-                  context,
-                  MaterialPageRoute(builder: (_) => const LoginScreen()),
-                );
               }
             },
             child: const Text('Cerrar Sesión'),

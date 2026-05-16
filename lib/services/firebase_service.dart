@@ -129,14 +129,19 @@ class FirebaseService {
     return DateTime.now().millisecondsSinceEpoch.toString();
   }
 
-  Stream<List<Rifa>> getRifas() {
+  Stream<List<Rifa>> getRifas({String? organizacionId}) {
     if (_useLocalData) {
       return Stream.value(_localRifas);
     }
+
+    var query = _firestore!.collection('rifas')
+        .orderBy('fechaCreacion', descending: true);
     
-    return _firestore!.collection('rifas')
-        .orderBy('fechaCreacion', descending: true)
-        .snapshots()
+    if (organizacionId != null) {
+      query = query.where('organizacionId', isEqualTo: organizacionId);
+    }
+
+    return query.snapshots()
         .map((snapshot) => snapshot.docs
             .map((doc) => Rifa.fromMap(doc.data(), doc.id))
             .toList());
@@ -210,27 +215,37 @@ class FirebaseService {
     _syncRifasToChatbot();
   }
 
-  Stream<List<Participante>> getParticipantes(String rifaId) {
+  Stream<List<Participante>> getParticipantes(String rifaId, {String? vendedorId}) {
     if (_useLocalData) {
       return Stream.value(_localParticipantes[rifaId] ?? []);
     }
-    
-    return _firestore!.collection('participantes')
-        .where('rifaId', isEqualTo: rifaId)
-        .snapshots()
+
+    var query = _firestore!.collection('participantes')
+        .where('rifaId', isEqualTo: rifaId);
+
+    if (vendedorId != null) {
+      query = query.where('vendedorId', isEqualTo: vendedorId);
+    }
+
+    return query.snapshots()
         .map((snapshot) => snapshot.docs
             .map((doc) => Participante.fromMap(doc.data(), doc.id))
             .toList());
   }
 
-  Future<List<Participante>> getParticipantesOnce(String rifaId) async {
+  Future<List<Participante>> getParticipantesOnce(String rifaId, {String? vendedorId}) async {
     if (_useLocalData) {
       return _localParticipantes[rifaId] ?? [];
     }
-    
-    final snapshot = await _firestore!.collection('participantes')
-        .where('rifaId', isEqualTo: rifaId)
-        .get();
+
+    var query = _firestore!.collection('participantes')
+        .where('rifaId', isEqualTo: rifaId);
+
+    if (vendedorId != null) {
+      query = query.where('vendedorId', isEqualTo: vendedorId);
+    }
+
+    final snapshot = await query.get();
     
     final results = snapshot.docs
         .map((doc) => Participante.fromMap(doc.data(), doc.id))
@@ -761,9 +776,24 @@ class FirebaseService {
     }
   }
 
-  Future<AppConfig?> getAppConfig() async {
+  Future<AppConfig?> getAppConfig({String? organizacionId}) async {
     if (_useLocalData) return null;
     try {
+      if (organizacionId != null) {
+        final doc = await _firestore!.collection('organizaciones').doc(organizacionId).get();
+        if (doc.exists) {
+          final data = doc.data()!;
+          return AppConfig(
+            organizacion: data['nombre'] ?? '',
+            responsable: data['responsable'] ?? '',
+            telefono: data['telefono'] ?? '',
+            email: data['email'] ?? '',
+            numeroCuenta: data['numeroCuenta'] ?? '',
+            metodoPago: data['metodoPago'] ?? 'nequi',
+          );
+        }
+      }
+
       final doc = await _firestore!.collection('config').doc('app').get();
       if (doc.exists) {
         return AppConfig.fromMap(doc.data()!);
@@ -775,10 +805,21 @@ class FirebaseService {
     }
   }
 
-  Future<void> updateAppConfig(AppConfig config) async {
+  Future<void> updateAppConfig(AppConfig config, {String? organizacionId}) async {
     if (_useLocalData) return;
     try {
-      await _firestore!.collection('config').doc('app').set(config.toMap());
+      if (organizacionId != null) {
+        await _firestore!.collection('organizaciones').doc(organizacionId).update({
+          'nombre': config.organizacion,
+          'responsable': config.responsable,
+          'telefono': config.telefono,
+          'email': config.email,
+          'numeroCuenta': config.numeroCuenta,
+          'metodoPago': config.metodoPago,
+        });
+      } else {
+        await _firestore!.collection('config').doc('app').set(config.toMap());
+      }
       debugPrint('[CONFIG] Configuración guardada');
     } catch (e) {
       debugPrint('[CONFIG] Error guardando configuración: $e');

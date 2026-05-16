@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../config/theme.dart';
 import '../config/constants.dart';
+import '../providers/auth_provider.dart';
 import '../providers/rifa_provider.dart';
 import '../models/rifa.dart';
 import '../models/participante.dart';
@@ -529,7 +529,8 @@ class _RifaDetalleScreenState extends State<_RifaDetalleScreen> {
   }
 
   void _contactWhatsApp(Participante p, Rifa rifa) async {
-    final config = await FirebaseService.instance.getAppConfig();
+    final auth = context.read<AuthProvider>();
+    final config = await FirebaseService.instance.getAppConfig(organizacionId: auth.organizacionId);
     final cuenta = (config?.numeroCuenta ?? '').trim();
     final metodo = config?.metodoPago ?? 'nequi';
     final labelCuenta = cuenta.isNotEmpty ? '$cuenta (${metodo.toUpperCase()})' : 'la cuenta indicada';

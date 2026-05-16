@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../config/theme.dart';
 import '../config/constants.dart';
+import '../providers/auth_provider.dart';
 import '../providers/rifa_provider.dart';
 import '../models/participante.dart';
 import '../models/rifa.dart';
@@ -462,7 +463,8 @@ class _SalesListScreenState extends State<SalesListScreen> {
   }
 
   void _contactWhatsApp(Participante p) async {
-    final config = await FirebaseService.instance.getAppConfig();
+    final auth = context.read<AuthProvider>();
+    final config = await FirebaseService.instance.getAppConfig(organizacionId: auth.organizacionId);
     final cuenta = (config?.numeroCuenta ?? '').trim();
     final metodo = config?.metodoPago ?? 'nequi';
     final labelCuenta = cuenta.isNotEmpty ? '$cuenta (${metodo.toUpperCase()})' : 'la cuenta indicada';

@@ -15,9 +15,24 @@ class RifaProvider extends ChangeNotifier {
   List<Rifa> _rifas = [];
   List<Rifa> get rifas => _rifas;
 
-  // Forzado a true para facilitar pruebas y gestión de UI durante el desarrollo
-  bool get isAdmin => true; 
+  String? _organizacionId;
+  String? _userId;
+  bool _esAdmin = true;
 
+  bool get isAdmin => _esAdmin;
+  String? get organizacionId => _organizacionId;
+
+  void setUserContext(String? orgId, String? userId, bool esAdmin) {
+    _organizacionId = orgId;
+    _userId = userId;
+    _esAdmin = esAdmin;
+    if (_rifaSeleccionada != null && orgId != null && _rifaSeleccionada!.organizacionId != orgId) {
+      _rifaSeleccionada = null;
+      _participantes.clear();
+      _numeros = {};
+    }
+    notifyListeners();
+  }
 
   Rifa? _rifaSeleccionada;
   Rifa? get rifaSeleccionada => _rifaSeleccionada;
@@ -43,7 +58,7 @@ class RifaProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      _firebaseService.getRifas().listen((rifas) {
+      _firebaseService.getRifas(organizacionId: _organizacionId).listen((rifas) {
         _rifas = rifas;
         _isLoading = false;
         notifyListeners();
@@ -134,7 +149,8 @@ class RifaProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final participantes = await _firebaseService.getParticipantesOnce(rifaId);
+      final vendedorId = _esAdmin ? null : _userId;
+      final participantes = await _firebaseService.getParticipantesOnce(rifaId, vendedorId: vendedorId);
       _participantes = participantes;
       _isLoading = false;
       notifyListeners();
@@ -150,7 +166,12 @@ class RifaProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final id = await _firebaseService.crearRifa(rifa);
+      final rifaConOrg = rifa.copyWith(
+        organizacionId: _organizacionId,
+        creadoPor: _userId,
+        vendedorId: _esAdmin ? null : _userId,
+      );
+      final id = await _firebaseService.crearRifa(rifaConOrg);
       await loadRifas();
       return id;
     } catch (e) {
@@ -230,7 +251,10 @@ class RifaProvider extends ChangeNotifier {
         estadoPago: EstadoPago.pendiente,
         fechaRegistro: DateTime.now(),
         totalPagado: 0,
-        botNotified: false, // Iniciar en false para que el bot lo detecte
+        botNotified: false,
+        organizacionId: _organizacionId,
+        creadoPor: _userId,
+        vendedorId: _esAdmin ? null : _userId,
       );
 
       final id = await _firebaseService.registrarParticipante(participante);

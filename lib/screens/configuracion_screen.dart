@@ -4,10 +4,10 @@ import 'package:provider/provider.dart';
 import 'package:http/http.dart' as http;
 import '../config/theme.dart';
 import '../config/constants.dart';
+import '../providers/auth_provider.dart';
 import '../providers/theme_provider.dart';
 import '../models/app_config.dart';
 import '../services/firebase_service.dart';
-import 'login_screen.dart';
 
 class ConfiguracionScreen extends StatefulWidget {
   const ConfiguracionScreen({super.key});
@@ -51,7 +51,8 @@ class _ConfiguracionScreenState extends State<ConfiguracionScreen> {
 
   Future<void> _loadAppConfig() async {
     try {
-      final config = await FirebaseService.instance.getAppConfig();
+      final auth = context.read<AuthProvider>();
+      final config = await FirebaseService.instance.getAppConfig(organizacionId: auth.organizacionId);
       if (config != null && mounted) {
         setState(() {
           _orgController.text = config.organizacion;
@@ -80,7 +81,18 @@ class _ConfiguracionScreenState extends State<ConfiguracionScreen> {
         numeroCuenta: _cuentaController.text.trim(),
         metodoPago: _metodoPago,
       );
-      await FirebaseService.instance.updateAppConfig(config);
+      final auth = context.read<AuthProvider>();
+      await FirebaseService.instance.updateAppConfig(config, organizacionId: auth.organizacionId);
+      if (auth.organizacionId != null) {
+        final org = auth.currentOrg?.copyWith(
+          nombre: config.organizacion,
+          telefono: config.telefono,
+          email: config.email,
+          metodoPago: config.metodoPago,
+          numeroCuenta: config.numeroCuenta,
+        );
+        if (org != null) await auth.updateOrgConfig(org);
+      }
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -172,14 +184,35 @@ class _ConfiguracionScreenState extends State<ConfiguracionScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  _buildSectionTitle(context, 'Mi Cuenta', Icons.person_rounded),
+                  _buildUserInfo(context),
+                  const SizedBox(height: 28),
                   _buildSectionTitle(context, 'Apariencia', Icons.palette_rounded),
                   _buildThemeToggle(context),
                   const SizedBox(height: 28),
-                  _buildSectionTitle(context, 'Chatbot WhatsApp', Icons.smart_toy_rounded),
-                  _buildChatbotSection(context),
-                  const SizedBox(height: 28),
-                  _buildSectionTitle(context, 'Datos del Usuario', Icons.business_rounded),
-                  _buildUserDataSection(context),
+                  Consumer<AuthProvider>(
+                    builder: (context, auth, _) {
+                      if (!auth.esAdmin) return const SizedBox.shrink();
+                      return Column(
+                        children: [
+                          _buildSectionTitle(context, 'Chatbot WhatsApp', Icons.smart_toy_rounded),
+                          _buildChatbotSection(context),
+                          const SizedBox(height: 28),
+                        ],
+                      );
+                    },
+                  ),
+                  Consumer<AuthProvider>(
+                    builder: (context, auth, _) {
+                      final readOnly = !auth.esAdmin;
+                      return Column(
+                        children: [
+                          _buildSectionTitle(context, 'Datos del Usuario', Icons.business_rounded),
+                          _buildUserDataSection(context, readOnly: readOnly),
+                        ],
+                      );
+                    },
+                  ),
                   const SizedBox(height: 28),
                   _buildSectionTitle(context, 'Región', Icons.public_rounded),
                   _buildRegionInfo(context),
@@ -287,6 +320,62 @@ class _ConfiguracionScreenState extends State<ConfiguracionScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildUserInfo(BuildContext context) {
+    return Consumer<AuthProvider>(
+      builder: (context, auth, _) {
+        final user = auth.currentUser;
+        final org = auth.currentOrg;
+        if (user == null) return const SizedBox.shrink();
+        return Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: AppTheme.cardColor,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: AppTheme.dividerColor),
+          ),
+          child: Row(
+            children: [
+              CircleAvatar(
+                radius: 28,
+                backgroundColor: AppTheme.primaryColor.withValues(alpha: 0.2),
+                child: Text(
+                  user.nombre.isNotEmpty ? user.nombre[0].toUpperCase() : 'U',
+                  style: GoogleFonts.outfit(fontSize: 24, fontWeight: FontWeight.w900, color: AppTheme.primaryColor),
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(user.nombre, style: GoogleFonts.outfit(fontWeight: FontWeight.w700, fontSize: 16)),
+                    Text(user.email, style: TextStyle(fontSize: 12, color: AppTheme.textSecondary)),
+                    const SizedBox(height: 4),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: (user.esAdmin ? AppTheme.primaryColor : Colors.orange).withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        user.esAdmin ? 'ADMINISTRADOR' : 'VENDEDOR',
+                        style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: user.esAdmin ? AppTheme.primaryColor : Colors.orange),
+                      ),
+                    ),
+                    if (org != null) ...[
+                      const SizedBox(height: 2),
+                      Text(org.nombre, style: TextStyle(fontSize: 11, color: AppTheme.textSecondary)),
+                    ],
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 
@@ -412,7 +501,7 @@ class _ConfiguracionScreenState extends State<ConfiguracionScreen> {
     );
   }
 
-  Widget _buildUserDataSection(BuildContext context) {
+  Widget _buildUserDataSection(BuildContext context, {bool readOnly = false}) {
     if (_isLoadingConfig) {
       return Container(
         padding: const EdgeInsets.all(24),
@@ -434,15 +523,15 @@ class _ConfiguracionScreenState extends State<ConfiguracionScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildCompactField(_orgController, 'Organización', Icons.business),
+          _buildCompactField(_orgController, 'Organización', Icons.business, readOnly: readOnly),
           const SizedBox(height: 8),
-          _buildCompactField(_respController, 'Responsable', Icons.person),
+          _buildCompactField(_respController, 'Responsable', Icons.person, readOnly: readOnly),
           const SizedBox(height: 8),
-          _buildCompactField(_telController, 'Teléfono', Icons.phone, TextInputType.phone),
+          _buildCompactField(_telController, 'Teléfono', Icons.phone, keyboardType: TextInputType.phone, readOnly: readOnly),
           const SizedBox(height: 8),
-          _buildCompactField(_emailController, 'Email', Icons.email, TextInputType.emailAddress),
+          _buildCompactField(_emailController, 'Email', Icons.email, keyboardType: TextInputType.emailAddress, readOnly: readOnly),
           const SizedBox(height: 8),
-          _buildCompactField(_cuentaController, 'N° Cuenta', Icons.account_balance, TextInputType.number),
+          _buildCompactField(_cuentaController, 'N° Cuenta', Icons.account_balance, keyboardType: TextInputType.number, readOnly: readOnly),
           const SizedBox(height: 10),
           Text(
             'MÉTODO DE PAGO',
@@ -453,38 +542,41 @@ class _ConfiguracionScreenState extends State<ConfiguracionScreen> {
           ),
           const SizedBox(height: 6),
           Row(children: [
-            _buildPagoChip('Nequi', 'nequi'),
+            _buildPagoChip('Nequi', 'nequi', readOnly: readOnly),
             const SizedBox(width: 6),
-            _buildPagoChip('Daviplata', 'daviplata'),
+            _buildPagoChip('Daviplata', 'daviplata', readOnly: readOnly),
             const SizedBox(width: 6),
-            _buildPagoChip('Bancolombia', 'bancolombia'),
+            _buildPagoChip('Bancolombia', 'bancolombia', readOnly: readOnly),
           ]),
-          const SizedBox(height: 10),
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton.icon(
-              onPressed: _isSavingConfig ? null : _saveAppConfig,
-              icon: _isSavingConfig
-                  ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black))
-                  : const Icon(Icons.save_rounded, size: 16),
-              label: Text(_isSavingConfig ? 'GUARDANDO...' : 'GUARDAR', style: GoogleFonts.outfit(fontWeight: FontWeight.w700, fontSize: 13)),
-              style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 10),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                minimumSize: const Size.fromHeight(36),
+          if (!readOnly) ...[
+            const SizedBox(height: 10),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: _isSavingConfig ? null : _saveAppConfig,
+                icon: _isSavingConfig
+                    ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black))
+                    : const Icon(Icons.save_rounded, size: 16),
+                label: Text(_isSavingConfig ? 'GUARDANDO...' : 'GUARDAR', style: GoogleFonts.outfit(fontWeight: FontWeight.w700, fontSize: 13)),
+                style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  minimumSize: const Size.fromHeight(36),
+                ),
               ),
             ),
-          ),
+          ],
         ],
       ),
     );
   }
 
-  Widget _buildCompactField(TextEditingController ctrl, String label, IconData icon, [TextInputType? kbType]) {
+  Widget _buildCompactField(TextEditingController ctrl, String label, IconData icon, {TextInputType? keyboardType, bool readOnly = false}) {
     return TextField(
       controller: ctrl,
+      readOnly: readOnly,
       style: GoogleFonts.outfit(fontWeight: FontWeight.w600, fontSize: 13),
-      keyboardType: kbType,
+      keyboardType: keyboardType,
       decoration: InputDecoration(
         labelText: label,
         labelStyle: GoogleFonts.outfit(fontSize: 12),
@@ -492,15 +584,17 @@ class _ConfiguracionScreenState extends State<ConfiguracionScreen> {
         contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         isDense: true,
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+        filled: readOnly,
+        fillColor: readOnly ? AppTheme.surfaceColor : null,
       ),
     );
   }
 
-  Widget _buildPagoChip(String label, String value) {
+  Widget _buildPagoChip(String label, String value, {bool readOnly = false}) {
     final selected = _metodoPago == value;
     return Expanded(
       child: GestureDetector(
-        onTap: () => setState(() => _metodoPago = value),
+        onTap: readOnly ? null : () => setState(() => _metodoPago = value),
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 8),
           decoration: BoxDecoration(
@@ -774,13 +868,9 @@ class _ConfiguracionScreenState extends State<ConfiguracionScreen> {
           ),
           ElevatedButton(
             onPressed: () async {
-              await FirebaseService.instance.logout();
+              await context.read<AuthProvider>().logout();
               if (context.mounted) {
                 Navigator.pop(context);
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const LoginScreen()),
-                );
               }
             },
             style: ElevatedButton.styleFrom(
