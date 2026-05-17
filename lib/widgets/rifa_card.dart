@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
@@ -290,9 +291,100 @@ class _RifaCardState extends State<RifaCard> with SingleTickerProviderStateMixin
                   ),
                 ],
               ),
-            ),
+          ),
+        ),
+        // Countdown overlay
+        if (widget.rifa.fechaSorteo != null)
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: _buildCountdownOverlay(),
           ),
       ],
+    );
+  }
+
+  Widget _buildCountdownOverlay() {
+    return StreamBuilder(
+      stream: Stream.periodic(const Duration(seconds: 1)),
+      builder: (context, snapshot) {
+        final now = DateTime.now();
+        final diff = widget.rifa.fechaSorteo!.difference(now);
+
+        if (diff.isNegative) {
+          return Container(
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            color: AppTheme.errorColor.withValues(alpha: 0.85),
+            child: const Text(
+              'SORTEO REALIZADO',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 10, color: Colors.white),
+            ),
+          );
+        }
+
+        final days = diff.inDays;
+        final hours = diff.inHours % 24;
+        final minutes = diff.inMinutes % 60;
+        final seconds = diff.inSeconds % 60;
+
+        return Container(
+          padding: const EdgeInsets.symmetric(vertical: 5),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.bottomCenter,
+              end: Alignment.topCenter,
+              colors: [
+                Colors.black.withValues(alpha: 0.85),
+                Colors.black.withValues(alpha: 0.5),
+                Colors.transparent,
+              ],
+            ),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.timer_outlined, color: AppTheme.primaryColor, size: 11),
+              const SizedBox(width: 4),
+              _buildTimePart(days, 'D'),
+              _buildTimeDivider(),
+              _buildTimePart(hours, 'H'),
+              _buildTimeDivider(),
+              _buildTimePart(minutes, 'M'),
+              _buildTimeDivider(),
+              _buildTimePart(seconds, 'S'),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildTimePart(int value, String label) {
+    return Row(
+      children: [
+        Text(
+          value.toString().padLeft(2, '0'),
+          style: GoogleFonts.outfit(
+            color: AppTheme.primaryColor,
+            fontWeight: FontWeight.w900,
+            fontSize: 13,
+          ),
+        ),
+        const SizedBox(width: 1),
+        Text(
+          label,
+          style: const TextStyle(color: Colors.white70, fontSize: 8, fontWeight: FontWeight.bold),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildTimeDivider() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+      child: Text(':', style: TextStyle(color: Colors.white38, fontWeight: FontWeight.bold, fontSize: 13)),
     );
   }
 

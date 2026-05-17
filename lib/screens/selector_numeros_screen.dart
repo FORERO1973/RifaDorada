@@ -112,8 +112,6 @@ class _SelectorNumerosViewState extends State<_SelectorNumerosView>
       ),
       body: Column(
         children: [
-          if (rifa.fechaSorteo != null)
-            _buildCountdown(rifa),
           if (rifa.imagenes.isNotEmpty)
             _buildImageCarousel(rifa),
           Container(
@@ -519,84 +517,6 @@ class _SelectorNumerosViewState extends State<_SelectorNumerosView>
     }
 
     return Container(color: Colors.black, child: imageWidget);
-  }
-
-  Widget _buildCountdown(Rifa rifa) {
-    return StreamBuilder(
-      stream: Stream.periodic(const Duration(seconds: 1)),
-      builder: (context, snapshot) {
-        final now = DateTime.now();
-        final diff = rifa.fechaSorteo!.difference(now);
-
-        if (diff.isNegative) {
-          return Container(
-            width: double.infinity,
-            padding: const EdgeInsets.symmetric(vertical: 8),
-            color: AppTheme.errorColor.withValues(alpha: 0.1),
-            child: const Text(
-              'EL SORTEO YA SE REALIZÓ',
-              textAlign: TextAlign.center,
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: AppTheme.errorColor),
-            ),
-          );
-        }
-
-        final days = diff.inDays;
-        final hours = diff.inHours % 24;
-        final minutes = diff.inMinutes % 60;
-        final seconds = diff.inSeconds % 60;
-
-        return Container(
-          width: double.infinity,
-          padding: const EdgeInsets.symmetric(vertical: 12),
-          decoration: BoxDecoration(
-            color: Colors.black,
-            border: Border(bottom: BorderSide(color: AppTheme.primaryColor.withValues(alpha: 0.3))),
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(Icons.timer_outlined, color: AppTheme.primaryColor, size: 16),
-              const SizedBox(width: 8),
-              _buildTimePart(days, 'D'),
-              _buildTimeDivider(),
-              _buildTimePart(hours, 'H'),
-              _buildTimeDivider(),
-              _buildTimePart(minutes, 'M'),
-              _buildTimeDivider(),
-              _buildTimePart(seconds, 'S'),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildTimePart(int value, String label) {
-    return Row(
-      children: [
-        Text(
-          value.toString().padLeft(2, '0'),
-          style: GoogleFonts.outfit(
-            color: AppTheme.primaryColor,
-            fontWeight: FontWeight.w900,
-            fontSize: 18,
-          ),
-        ),
-        const SizedBox(width: 2),
-        Text(
-          label,
-          style: const TextStyle(color: Colors.white54, fontSize: 10, fontWeight: FontWeight.bold),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildTimeDivider() {
-    return const Padding(
-      padding: EdgeInsets.symmetric(horizontal: 8),
-      child: Text(':', style: TextStyle(color: Colors.white24, fontWeight: FontWeight.bold)),
-    );
   }
 }
 
