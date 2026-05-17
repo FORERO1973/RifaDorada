@@ -293,19 +293,18 @@ class _RifaCardState extends State<RifaCard> with SingleTickerProviderStateMixin
               ),
           ),
         ),
-        // Countdown overlay
+        // Countdown badge (right side)
         if (widget.rifa.fechaSorteo != null)
           Positioned(
-            left: 0,
-            right: 0,
-            bottom: 0,
-            child: _buildCountdownOverlay(),
+            top: 40,
+            right: 12,
+            child: _buildCountdownBadge(),
           ),
       ],
     );
   }
 
-  Widget _buildCountdownOverlay() {
+  Widget _buildCountdownBadge() {
     return StreamBuilder(
       stream: Stream.periodic(const Duration(seconds: 1)),
       builder: (context, snapshot) {
@@ -314,12 +313,14 @@ class _RifaCardState extends State<RifaCard> with SingleTickerProviderStateMixin
 
         if (diff.isNegative) {
           return Container(
-            padding: const EdgeInsets.symmetric(vertical: 4),
-            color: AppTheme.errorColor.withValues(alpha: 0.85),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: AppTheme.errorColor.withValues(alpha: 0.85),
+              borderRadius: BorderRadius.circular(8),
+            ),
             child: const Text(
-              'SORTEO REALIZADO',
-              textAlign: TextAlign.center,
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 10, color: Colors.white),
+              'FIN',
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 9, color: Colors.white),
             ),
           );
         }
@@ -330,30 +331,23 @@ class _RifaCardState extends State<RifaCard> with SingleTickerProviderStateMixin
         final seconds = diff.inSeconds % 60;
 
         return Container(
-          padding: const EdgeInsets.symmetric(vertical: 5),
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
           decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.bottomCenter,
-              end: Alignment.topCenter,
-              colors: [
-                Colors.black.withValues(alpha: 0.85),
-                Colors.black.withValues(alpha: 0.5),
-                Colors.transparent,
-              ],
-            ),
+            color: Colors.black.withValues(alpha: 0.65),
+            borderRadius: BorderRadius.circular(8),
           ),
           child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.timer_outlined, color: AppTheme.primaryColor, size: 11),
-              const SizedBox(width: 4),
-              _buildTimePart(days, 'D'),
+              const Icon(Icons.timer_outlined, color: AppTheme.primaryColor, size: 10),
+              const SizedBox(width: 3),
+              _buildTimePart(days, 'd'),
               _buildTimeDivider(),
-              _buildTimePart(hours, 'H'),
+              _buildTimePart(hours, 'h'),
               _buildTimeDivider(),
-              _buildTimePart(minutes, 'M'),
+              _buildTimePart(minutes, 'm'),
               _buildTimeDivider(),
-              _buildTimePart(seconds, 'S'),
+              _buildTimePart(seconds, 's'),
             ],
           ),
         );
