@@ -348,14 +348,19 @@ class _SelectorNumerosViewState extends State<_SelectorNumerosView>
         color: AppTheme.surfaceColor,
         border: Border(top: BorderSide(color: AppTheme.dividerColor)),
       ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          _buildLegendItem('Libre', AppTheme.surfaceColor, border: true),
-          _buildLegendItem('Reservado', AppTheme.numeroReservado),
-          _buildLegendItem('Pagado', AppTheme.numeroPagado),
-          _buildLegendItem('Tu Selección', AppTheme.numeroSeleccionado),
-        ],
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          children: [
+            _buildLegendItem('Libre', AppTheme.surfaceColor, border: true),
+            const SizedBox(width: 12),
+            _buildLegendItem('Reservado', AppTheme.numeroReservado),
+            const SizedBox(width: 12),
+            _buildLegendItem('Pagado', AppTheme.numeroPagado),
+            const SizedBox(width: 12),
+            _buildLegendItem('Tu Selección', AppTheme.numeroSeleccionado),
+          ],
+        ),
       ),
     );
   }
@@ -383,7 +388,7 @@ class _SelectorNumerosViewState extends State<_SelectorNumerosView>
 
   Widget _buildImageCarousel(Rifa rifa) {
     return SizedBox(
-      height: 220,
+      height: 180,
       width: double.infinity,
       child: Stack(
         children: [

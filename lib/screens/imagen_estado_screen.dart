@@ -97,47 +97,49 @@ class _ImagenEstadoScreenState extends State<ImagenEstadoScreen> {
             ),
         ],
       ),
-      body: Screenshot(
-        controller: _screenshotController,
-        child: Container(
-          padding: const EdgeInsets.all(16),
-          color: AppTheme.backgroundColor, // Asegurar fondo sólido para la captura
-          child: Column(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: AppTheme.surfaceColor,
-                borderRadius: BorderRadius.circular(16),
+      body: SingleChildScrollView(
+        child: Screenshot(
+          controller: _screenshotController,
+          child: Container(
+            padding: const EdgeInsets.all(12),
+            color: AppTheme.backgroundColor,
+            child: Column(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppTheme.surfaceColor,
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Column(
+                  children: [
+                    Text(
+                      rifa.nombre,
+                      style: Theme.of(context).textTheme.titleMedium,
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 6),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        _buildLegendItem('Disponible', AppTheme.numeroDisponible),
+                        const SizedBox(width: 6),
+                        _buildLegendItem('Reservado', AppTheme.numeroReservado),
+                        const SizedBox(width: 6),
+                        _buildLegendItem('Pagado', AppTheme.numeroPagado),
+                      ],
+                    ),
+                  ],
+                ),
               ),
-              child: Column(
-                children: [
-                  Text(
-                    rifa.nombre,
-                    style: Theme.of(context).textTheme.headlineSmall,
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      _buildLegendItem('Disponible', AppTheme.numeroDisponible),
-                      const SizedBox(width: 8),
-                      _buildLegendItem('Reservado', AppTheme.numeroReservado),
-                      const SizedBox(width: 8),
-                      _buildLegendItem('Pagado', AppTheme.numeroPagado),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 16),
-            Expanded(
-              child: GridView.builder(
-                physics: const NeverScrollableScrollPhysics(), // Para que se capture completa
+              const SizedBox(height: 12),
+              GridView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
                 gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                   crossAxisCount: rifa.tipoRifa == '3 cifras' ? 8 : 10,
-                  crossAxisSpacing: 8,
-                  mainAxisSpacing: 8,
+                  crossAxisSpacing: 4,
+                  mainAxisSpacing: 4,
                   childAspectRatio: 1,
                 ),
                 itemCount: rifa.cantidadNumeros,
@@ -163,14 +165,14 @@ class _ImagenEstadoScreenState extends State<ImagenEstadoScreen> {
                   return Container(
                     decoration: BoxDecoration(
                       color: backgroundColor,
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: BorderRadius.circular(4),
                       border: Border.all(color: Colors.white10),
                     ),
                     alignment: Alignment.center,
                     child: Text(
                       numero,
                       style: TextStyle(
-                        fontSize: rifa.tipoRifa == '3 cifras' ? 9 : 12,
+                        fontSize: rifa.tipoRifa == '3 cifras' ? 8 : 10,
                         fontWeight: FontWeight.w900,
                         color: isReserved ? AppTheme.backgroundColor : Colors.white,
                       ),
@@ -178,8 +180,8 @@ class _ImagenEstadoScreenState extends State<ImagenEstadoScreen> {
                   );
                 },
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     ),
