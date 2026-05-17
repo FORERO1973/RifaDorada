@@ -43,3 +43,6 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# WhatsApp bot uploaded images (runtime data)
+whatsapp_bot/uploads/
