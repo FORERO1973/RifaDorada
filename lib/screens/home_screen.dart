@@ -165,7 +165,7 @@ class _HomeScreenState extends State<HomeScreen>
     if (rifasConGanador.isEmpty) return const SizedBox.shrink();
 
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Row(
           children: [
