@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -6,6 +7,7 @@ import 'package:screenshot/screenshot.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:path_provider/path_provider.dart';
 import '../config/theme.dart';
+import '../config/constants.dart';
 import '../providers/rifa_provider.dart';
 import '../models/rifa.dart';
 import '../utils/web_helper.dart';
@@ -105,6 +107,10 @@ class _ImagenEstadoScreenState extends State<ImagenEstadoScreen> {
             color: AppTheme.backgroundColor,
             child: Column(
             children: [
+              if (rifa.imagenes.isNotEmpty)
+                _buildPrizeImages(rifa.imagenes),
+              if (rifa.imagenes.isNotEmpty)
+                const SizedBox(height: 12),
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
@@ -118,7 +124,24 @@ class _ImagenEstadoScreenState extends State<ImagenEstadoScreen> {
                       style: Theme.of(context).textTheme.titleMedium,
                       textAlign: TextAlign.center,
                     ),
-                    const SizedBox(height: 6),
+                    const SizedBox(height: 4),
+                    Text(
+                      AppConstants.formatCurrencyCOP(rifa.precioNumero),
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        color: AppTheme.primaryColor,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    if (rifa.infoLoterias.isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        rifa.infoLoterias,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: AppTheme.textSecondary,
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 8),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
@@ -187,6 +210,39 @@ class _ImagenEstadoScreenState extends State<ImagenEstadoScreen> {
     ),
   );
 }
+
+  Widget _buildPrizeImages(List<String> imagenes) {
+    final images = imagenes.take(2).toList();
+    return SizedBox(
+      height: 160,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: images.length == 1
+            ? _buildImageWidget(images[0])
+            : Row(
+                children: [
+                  Expanded(child: _buildImageWidget(images[0])),
+                  const SizedBox(width: 4),
+                  Expanded(child: _buildImageWidget(images[1])),
+                ],
+              ),
+      ),
+    );
+  }
+
+  Widget _buildImageWidget(String path) {
+    if (path.startsWith('http')) {
+      return Image.network(path, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const SizedBox());
+    }
+    if (path.startsWith('data:image/')) {
+      final base64 = path.contains('base64,') ? path.split('base64,')[1] : path;
+      return Image.memory(base64Decode(base64), fit: BoxFit.cover, errorBuilder: (_, __, ___) => const SizedBox());
+    }
+    if (!kIsWeb) {
+      return Image.file(File(path), fit: BoxFit.cover, errorBuilder: (_, __, ___) => const SizedBox());
+    }
+    return const SizedBox();
+  }
 
   Widget _buildLegendItem(String label, Color color) {
     return Row(
