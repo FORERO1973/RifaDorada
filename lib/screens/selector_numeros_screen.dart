@@ -350,8 +350,8 @@ class _SelectorNumerosViewState extends State<_SelectorNumerosView>
         color: AppTheme.surfaceColor,
         border: Border(top: BorderSide(color: AppTheme.dividerColor)),
       ),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
         child: Row(
           children: [
             _buildLegendItem('Libre', AppTheme.surfaceColor, border: true),
