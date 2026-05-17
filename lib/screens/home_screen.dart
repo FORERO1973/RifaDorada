@@ -515,7 +515,7 @@ class _HomeScreenState extends State<HomeScreen>
           content: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 TextField(
                   controller: nombreController,
@@ -607,44 +607,46 @@ class _HomeScreenState extends State<HomeScreen>
                 if (editImages.isNotEmpty)
                   SizedBox(
                     height: 60,
-                    child: ListView.separated(
+                    child: SingleChildScrollView(
                       scrollDirection: Axis.horizontal,
-                      itemCount: editImages.length + (editImages.length < 5 ? 1 : 0),
-                      separatorBuilder: (_, __) => const SizedBox(width: 6),
-                      itemBuilder: (context, index) {
-                        if (index == editImages.length) {
-                          return GestureDetector(
-                            onTap: () async {
-                              final image = await picker.pickImage(source: ImageSource.gallery, maxWidth: 1024, maxHeight: 1024, imageQuality: 80);
-                              if (image != null) setState(() => editImages.add(image.path));
-                            },
-                            child: Container(
-                              width: 60, height: 60,
-                              decoration: BoxDecoration(
-                                color: AppTheme.surfaceColor,
-                                borderRadius: BorderRadius.circular(8),
-                                border: Border.all(color: AppTheme.dividerColor),
-                              ),
-                              child: Icon(Icons.add_photo_alternate_outlined, color: AppTheme.textSecondary, size: 24),
-                            ),
-                          );
-                        }
-                        return Stack(
-                          children: [
-                            _buildThumbnail(editImages[index], 60),
-                            Positioned(
-                              top: 0, right: 0,
-                              child: GestureDetector(
-                                onTap: () => setState(() => editImages.removeAt(index)),
-                                child: Container(
-                                  decoration: BoxDecoration(color: AppTheme.errorColor, shape: BoxShape.circle),
-                                  child: const Icon(Icons.close, size: 14, color: Colors.white),
+                      child: Row(
+                        children: [
+                          ...editImages.map((img) => Padding(
+                            padding: const EdgeInsets.only(right: 6),
+                            child: Stack(
+                              children: [
+                                _buildThumbnail(img, 60),
+                                Positioned(
+                                  top: 0, right: 0,
+                                  child: GestureDetector(
+                                    onTap: () => setState(() => editImages.remove(img)),
+                                    child: Container(
+                                      decoration: BoxDecoration(color: AppTheme.errorColor, shape: BoxShape.circle),
+                                      child: const Icon(Icons.close, size: 14, color: Colors.white),
+                                    ),
+                                  ),
                                 ),
+                              ],
+                            ),
+                          )),
+                          if (editImages.length < 5)
+                            GestureDetector(
+                              onTap: () async {
+                                final image = await picker.pickImage(source: ImageSource.gallery, maxWidth: 1024, maxHeight: 1024, imageQuality: 80);
+                                if (image != null) setState(() => editImages.add(image.path));
+                              },
+                              child: Container(
+                                width: 60, height: 60,
+                                decoration: BoxDecoration(
+                                  color: AppTheme.surfaceColor,
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(color: AppTheme.dividerColor),
+                                ),
+                                child: Icon(Icons.add_photo_alternate_outlined, color: AppTheme.textSecondary, size: 24),
                               ),
                             ),
-                          ],
-                        );
-                      },
+                        ],
+                      ),
                     ),
                   )
                 else
