@@ -115,7 +115,7 @@ class _SelectorNumerosViewState extends State<_SelectorNumerosView>
           if (rifa.imagenes.isNotEmpty)
             _buildImageCarousel(rifa),
           Container(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.fromLTRB(16, 10, 16, 6),
             color: AppTheme.surfaceColor,
             child: Column(
               children: [
@@ -126,17 +126,17 @@ class _SelectorNumerosViewState extends State<_SelectorNumerosView>
                       context,
                       Icons.attach_money,
                       AppConstants.formatCurrencyCOP(rifa.precioNumero),
-                      'Por número',
+                      'Precio',
                     ),
                     _buildInfoChip(
                       context,
                       Icons.tag,
                       '${rifa.cantidadNumeros}',
-                      'Total números',
+                      'Números',
                     ),
                   ],
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 10),
                 TextField(
                   controller: _searchController,
                   keyboardType: TextInputType.number,
@@ -324,17 +324,21 @@ class _SelectorNumerosViewState extends State<_SelectorNumerosView>
     String value,
     String label,
   ) {
-    return Column(
+    return Row(
+      mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, color: AppTheme.primaryColor),
-        const SizedBox(height: 4),
-        Text(
-          value,
-          style: Theme.of(
-            context,
-          ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+        Icon(icon, color: AppTheme.primaryColor, size: 16),
+        const SizedBox(width: 6),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              value,
+              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppTheme.textPrimary),
+            ),
+            Text(label, style: const TextStyle(fontSize: 9, color: AppTheme.textSecondary)),
+          ],
         ),
-        Text(label, style: Theme.of(context).textTheme.bodySmall),
       ],
     );
   }
