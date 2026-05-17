@@ -1,8 +1,15 @@
+import 'dart:io';
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:http/http.dart' as http;
 import '../config/theme.dart';
+import '../config/constants.dart';
 import '../providers/rifa_provider.dart';
 import '../widgets/rifa_card.dart';
 import '../models/rifa.dart';
@@ -491,54 +498,83 @@ class _HomeScreenState extends State<HomeScreen>
   void _showEditDialog(BuildContext context, Rifa rifa, RifaProvider provider) {
     final nombreController = TextEditingController(text: rifa.nombre);
     final descripcionController = TextEditingController(text: rifa.descripcion);
-    final precioController = TextEditingController(text: rifa.precioNumero.toString());
+    final precioController = TextEditingController(text: rifa.precioNumero.toStringAsFixed(0));
+    final picker = ImagePicker();
+    List<String> editImages = List.from(rifa.imagenes);
+    bool saving = false;
     String? selectedLoteria = rifa.loteria;
     String? selectedDia = rifa.diaSorteo;
     DateTime? selectedFecha = rifa.fechaSorteo;
 
     showDialog(
       context: context,
-      builder: (context) => StatefulBuilder(
+      builder: (dialogContext) => StatefulBuilder(
         builder: (context, setState) => AlertDialog(
           title: const Text('Editar Rifa'),
+          contentPadding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
           content: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 TextField(
                   controller: nombreController,
-                  decoration: const InputDecoration(labelText: 'Nombre'),
+                  style: const TextStyle(fontSize: 13),
+                  decoration: const InputDecoration(
+                    labelText: 'Nombre',
+                    isDense: true,
+                    contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                  ),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 8),
                 TextField(
                   controller: descripcionController,
-                  decoration: const InputDecoration(labelText: 'Descripción'),
+                  style: const TextStyle(fontSize: 13),
+                  decoration: const InputDecoration(
+                    labelText: 'Descripción',
+                    isDense: true,
+                    contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                  ),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 8),
                 TextField(
                   controller: precioController,
                   keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(labelText: 'Precio'),
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  style: const TextStyle(fontSize: 13),
+                  decoration: const InputDecoration(
+                    labelText: 'Precio (COP)',
+                    hintText: '0',
+                    isDense: true,
+                    contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                  ),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 8),
                 DropdownButtonFormField<String>(
                   initialValue: selectedLoteria,
-                  decoration: const InputDecoration(labelText: 'Lotería'),
-                  items: LoteriasColombia.principales.map((l) => DropdownMenuItem(value: l, child: Text(l))).toList(),
+                  style: TextStyle(fontSize: 13, color: AppTheme.textPrimary),
+                  decoration: const InputDecoration(
+                    labelText: 'Lotería',
+                    isDense: true,
+                    contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  ),
+                  items: LoteriasColombia.principales.map((l) => DropdownMenuItem(value: l, child: Text(l, style: const TextStyle(fontSize: 13)))).toList(),
                   onChanged: (val) => setState(() => selectedLoteria = val),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 8),
                 DropdownButtonFormField<String>(
                   initialValue: selectedDia,
-                  decoration: const InputDecoration(labelText: 'Día de Sorteo'),
-                  items: LoteriasColombia.diasSemana.map((d) => DropdownMenuItem(value: d, child: Text(d))).toList(),
+                  style: TextStyle(fontSize: 13, color: AppTheme.textPrimary),
+                  decoration: const InputDecoration(
+                    labelText: 'Día de Sorteo',
+                    isDense: true,
+                    contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  ),
+                  items: LoteriasColombia.diasSemana.map((d) => DropdownMenuItem(value: d, child: Text(d, style: const TextStyle(fontSize: 13)))).toList(),
                   onChanged: (val) => setState(() => selectedDia = val),
                 ),
-                const SizedBox(height: 12),
-                ListTile(
-                  title: const Text('Fecha de Sorteo'),
-                  subtitle: Text(selectedFecha != null ? DateFormat('dd/MM/yyyy').format(selectedFecha!) : 'No seleccionada'),
-                  trailing: const Icon(Icons.calendar_today),
+                const SizedBox(height: 8),
+                InkWell(
                   onTap: () async {
                     final picked = await showDatePicker(
                       context: context,
@@ -548,37 +584,171 @@ class _HomeScreenState extends State<HomeScreen>
                     );
                     if (picked != null) setState(() => selectedFecha = picked);
                   },
+                  child: InputDecorator(
+                    decoration: const InputDecoration(
+                      labelText: 'Fecha de Sorteo',
+                      isDense: true,
+                      contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                      suffixIcon: Icon(Icons.calendar_today, size: 18),
+                    ),
+                    child: Text(
+                      selectedFecha != null ? DateFormat('dd/MM/yyyy').format(selectedFecha!) : 'No seleccionada',
+                      style: const TextStyle(fontSize: 13),
+                    ),
+                  ),
                 ),
+                const SizedBox(height: 12),
+                Text('Imágenes', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppTheme.textSecondary)),
+                const SizedBox(height: 6),
+                if (editImages.isNotEmpty)
+                  SizedBox(
+                    height: 60,
+                    child: ListView.separated(
+                      scrollDirection: Axis.horizontal,
+                      itemCount: editImages.length + (editImages.length < 5 ? 1 : 0),
+                      separatorBuilder: (_, __) => const SizedBox(width: 6),
+                      itemBuilder: (context, index) {
+                        if (index == editImages.length) {
+                          return GestureDetector(
+                            onTap: () async {
+                              final image = await picker.pickImage(source: ImageSource.gallery, maxWidth: 1024, maxHeight: 1024, imageQuality: 80);
+                              if (image != null) setState(() => editImages.add(image.path));
+                            },
+                            child: Container(
+                              width: 60, height: 60,
+                              decoration: BoxDecoration(
+                                color: AppTheme.surfaceColor,
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: AppTheme.dividerColor),
+                              ),
+                              child: Icon(Icons.add_photo_alternate_outlined, color: AppTheme.textSecondary, size: 24),
+                            ),
+                          );
+                        }
+                        return Stack(
+                          children: [
+                            _buildThumbnail(editImages[index], 60),
+                            Positioned(
+                              top: 0, right: 0,
+                              child: GestureDetector(
+                                onTap: () => setState(() => editImages.removeAt(index)),
+                                child: Container(
+                                  decoration: BoxDecoration(color: AppTheme.errorColor, shape: BoxShape.circle),
+                                  child: const Icon(Icons.close, size: 14, color: Colors.white),
+                                ),
+                              ),
+                            ),
+                          ],
+                        );
+                      },
+                    ),
+                  )
+                else
+                  GestureDetector(
+                    onTap: () async {
+                      final image = await picker.pickImage(source: ImageSource.gallery, maxWidth: 1024, maxHeight: 1024, imageQuality: 80);
+                      if (image != null) setState(() => editImages.add(image.path));
+                    },
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      decoration: BoxDecoration(
+                        color: AppTheme.surfaceColor,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: AppTheme.dividerColor, style: BorderStyle.solid),
+                      ),
+                      child: const Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.add_photo_alternate_outlined, color: AppTheme.textSecondary, size: 18),
+                          SizedBox(width: 6),
+                          Text('Agregar imágenes', style: TextStyle(fontSize: 12, color: AppTheme.textSecondary)),
+                        ],
+                      ),
+                    ),
+                  ),
               ],
             ),
           ),
+          actionsPadding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
           actions: [
             TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancelar'),
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Cancelar', style: TextStyle(fontSize: 13)),
             ),
             ElevatedButton(
-              onPressed: () {
-                final updatedRifa = rifa.copyWith(
-                  nombre: nombreController.text,
-                  descripcion: descripcionController.text,
-                  precioNumero: double.tryParse(precioController.text) ?? rifa.precioNumero,
-                  loteria: selectedLoteria,
-                  diaSorteo: selectedDia,
-                  fechaSorteo: selectedFecha,
-                );
-                provider.actualizarRifa(updatedRifa);
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Rifa actualizada')),
-                );
+              onPressed: saving ? null : () async {
+                setState(() => saving = true);
+                try {
+                  List<String> finalImages = List.from(editImages);
+                  final localPaths = finalImages.where((p) => !p.startsWith('http') && !p.startsWith('data:') && !p.startsWith('blob:') && !kIsWeb).toList();
+                  if (localPaths.isNotEmpty) {
+                    try {
+                      final uri = Uri.parse('${AppConstants.chatbotApi}/upload-images');
+                      final base64List = <String>[];
+                      for (final path in localPaths) {
+                        final bytes = await File(path).readAsBytes();
+                        base64List.add(base64Encode(bytes));
+                      }
+                      final response = await http.post(uri, headers: {'Content-Type': 'application/json'}, body: jsonEncode({'images': base64List}));
+                      if (response.statusCode == 200) {
+                        final urls = List<String>.from(jsonDecode(response.body)['urls']);
+                        int urlIdx = 0;
+                        finalImages = finalImages.map((p) {
+                          if (localPaths.contains(p)) return urls[urlIdx++];
+                          return p;
+                        }).toList();
+                      }
+                    } catch (_) {
+                      finalImages = finalImages.map((p) {
+                        if (localPaths.contains(p)) return 'data:image/jpeg;base64,${base64Encode(File(p).readAsBytesSync())}';
+                        return p;
+                      }).toList();
+                    }
+                  }
+                  final precio = double.tryParse(precioController.text.replaceAll(RegExp(r'[^0-9]'), '')) ?? rifa.precioNumero;
+                  final updatedRifa = rifa.copyWith(
+                    nombre: nombreController.text,
+                    descripcion: descripcionController.text,
+                    precioNumero: precio,
+                    loteria: selectedLoteria,
+                    diaSorteo: selectedDia,
+                    fechaSorteo: selectedFecha,
+                    imagenes: finalImages,
+                  );
+                  await provider.actualizarRifa(updatedRifa);
+                  if (dialogContext.mounted) Navigator.pop(dialogContext);
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Rifa actualizada')));
+                  }
+                } catch (e) {
+                  setState(() => saving = false);
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e'), backgroundColor: AppTheme.errorColor));
+                  }
+                }
               },
-              child: const Text('Guardar'),
+              child: saving
+                  ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                  : const Text('Guardar', style: TextStyle(fontSize: 13)),
             ),
           ],
         ),
       ),
     );
+  }
+
+  Widget _buildThumbnail(String path, double size) {
+    Widget child;
+    if (path.startsWith('http') || path.startsWith('blob:')) {
+      child = Image.network(path, fit: BoxFit.cover, width: size, height: size);
+    } else if (path.startsWith('data:image/')) {
+      final b64 = path.contains('base64,') ? path.split('base64,')[1] : path;
+      child = Image.memory(base64Decode(b64), fit: BoxFit.cover, width: size, height: size);
+    } else {
+      child = Image.file(File(path), fit: BoxFit.cover, width: size, height: size);
+    }
+    return ClipRRect(borderRadius: BorderRadius.circular(8), child: child);
   }
 
 

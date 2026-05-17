@@ -296,7 +296,7 @@ class _RifaCardState extends State<RifaCard> with SingleTickerProviderStateMixin
         // Countdown badge (right side)
         if (widget.rifa.fechaSorteo != null)
           Positioned(
-            top: 40,
+            bottom: 12,
             right: 12,
             child: _buildCountdownBadge(),
           ),
