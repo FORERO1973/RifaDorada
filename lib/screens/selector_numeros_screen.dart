@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -475,35 +476,44 @@ class _SelectorNumerosViewState extends State<_SelectorNumerosView>
   Widget _buildImageWidget(String path) {
     if (path.isEmpty) return const Center(child: Icon(Icons.image_not_supported));
 
-    return Container(
-      color: Colors.black,
-      child: kIsWeb || path.startsWith('http') || path.startsWith('blob:')
-          ? Image.network(
-              path,
-              fit: BoxFit.contain,
-              errorBuilder: (context, error, stackTrace) {
-                debugPrint('Error loading image: $error');
-                return Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Icon(Icons.broken_image, color: Colors.white24, size: 40),
-                      const SizedBox(height: 8),
-                      const Text(
-                        'Error al cargar imagen',
-                        style: TextStyle(color: Colors.white24, fontSize: 10),
-                      ),
-                    ],
-                  ),
-                );
-              },
-            )
-          : Image.file(
-              File(path),
-              fit: BoxFit.contain,
-              errorBuilder: (context, error, stackTrace) => const Center(child: Icon(Icons.broken_image, color: Colors.white24)),
+    Widget imageWidget;
+    if (kIsWeb || path.startsWith('http') || path.startsWith('blob:')) {
+      imageWidget = Image.network(
+        path,
+        fit: BoxFit.contain,
+        errorBuilder: (context, error, stackTrace) {
+          debugPrint('Error loading image: $error');
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.broken_image, color: Colors.white24, size: 40),
+                const SizedBox(height: 8),
+                const Text(
+                  'Error al cargar imagen',
+                  style: TextStyle(color: Colors.white24, fontSize: 10),
+                ),
+              ],
             ),
-    );
+          );
+        },
+      );
+    } else if (path.startsWith('data:image/')) {
+      final base64 = path.contains('base64,') ? path.split('base64,')[1] : path;
+      imageWidget = Image.memory(
+        base64Decode(base64),
+        fit: BoxFit.contain,
+        errorBuilder: (context, error, stackTrace) => const Center(child: Icon(Icons.broken_image, color: Colors.white24)),
+      );
+    } else {
+      imageWidget = Image.file(
+        File(path),
+        fit: BoxFit.contain,
+        errorBuilder: (context, error, stackTrace) => const Center(child: Icon(Icons.broken_image, color: Colors.white24)),
+      );
+    }
+
+    return Container(color: Colors.black, child: imageWidget);
   }
 
   Widget _buildCountdown(Rifa rifa) {

@@ -1,10 +1,10 @@
 import 'dart:io';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:path/path.dart' as p;
+import 'package:http/http.dart' as http;
 import '../config/theme.dart';
 import '../config/constants.dart';
 import '../models/rifa.dart';
@@ -646,8 +646,9 @@ class _CrearRifaScreenState extends State<CrearRifaScreen> {
   }
 
   Widget _buildImageWidget(String imagePath) {
-    if (kIsWeb) {
-      return Image.network(
+    Widget imageWidget;
+    if (kIsWeb || imagePath.startsWith('http') || imagePath.startsWith('blob:')) {
+      imageWidget = Image.network(
         imagePath,
         fit: BoxFit.cover,
         errorBuilder: (context, error, stackTrace) {
@@ -661,8 +662,20 @@ class _CrearRifaScreenState extends State<CrearRifaScreen> {
           return const Center(child: CircularProgressIndicator());
         },
       );
+    } else if (imagePath.startsWith('data:image/')) {
+      final base64 = imagePath.contains('base64,') ? imagePath.split('base64,')[1] : imagePath;
+      imageWidget = Image.memory(
+        base64Decode(base64),
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) {
+          return Container(
+            color: AppTheme.surfaceColor,
+            child: const Icon(Icons.broken_image, size: 50, color: AppTheme.textSecondary),
+          );
+        },
+      );
     } else {
-      return Image.file(
+      imageWidget = Image.file(
         File(imagePath),
         fit: BoxFit.cover,
         errorBuilder: (context, error, stackTrace) {
@@ -673,6 +686,7 @@ class _CrearRifaScreenState extends State<CrearRifaScreen> {
         },
       );
     }
+    return imageWidget;
   }
 
   Future<void> _pickImage(ImageSource source) async {
@@ -947,25 +961,25 @@ class _CrearRifaScreenState extends State<CrearRifaScreen> {
     setState(() => _isLoading = true);
 
     try {
-      final List<String> localPaths = [];
-      
-      // Solo en plataformas móviles (Android/iOS)
-      if (!kIsWeb) {
-        final appDir = await getApplicationDocumentsDirectory();
-        final imagesDir = Directory(p.join(appDir.path, 'rifas_images'));
-        if (!await imagesDir.exists()) {
-          await imagesDir.create(recursive: true);
-        }
+      List<String> imageUrls = List.from(_imagenes);
 
-        for (String tempPath in _imagenes) {
-          final fileName = 'rifa_${DateTime.now().millisecondsSinceEpoch}_${p.basename(tempPath)}';
-          final newPath = p.join(imagesDir.path, fileName);
-          await File(tempPath).copy(newPath);
-          localPaths.add(newPath);
+      if (_imagenes.isNotEmpty) {
+        try {
+          imageUrls = await _uploadImages(_imagenes);
+        } catch (e) {
+          debugPrint('[UPLOAD FALLBACK] Bot no disponible, usando base64: $e');
+          final List<String> base64Images = [];
+          for (final path in _imagenes) {
+            if (kIsWeb) {
+              base64Images.add(path);
+            } else {
+              final bytes = await File(path).readAsBytes();
+              final b64 = base64Encode(bytes);
+              base64Images.add('data:image/jpeg;base64,$b64');
+            }
+          }
+          imageUrls = base64Images;
         }
-      } else {
-        // En Web no podemos copiar a archivos locales persistentes de la misma forma
-        localPaths.addAll(_imagenes);
       }
 
       if (!mounted) return;
@@ -982,7 +996,7 @@ class _CrearRifaScreenState extends State<CrearRifaScreen> {
         fechaSorteo: _fechaSorteo,
         loteria: _loteriaSeleccionada,
         diaSorteo: _diaSorteoSeleccionado,
-        imagenes: localPaths,
+        imagenes: imageUrls,
         organizacion: _organizacionController.text.trim().isEmpty ? null : _organizacionController.text.trim(),
         responsable: _responsableController.text.trim().isEmpty ? null : _responsableController.text.trim(),
         contactoResponsable: _contactoController.text.trim().isEmpty ? null : _contactoController.text.trim(),
@@ -1013,5 +1027,28 @@ class _CrearRifaScreenState extends State<CrearRifaScreen> {
         setState(() => _isLoading = false);
       }
     }
+  }
+
+  Future<List<String>> _uploadImages(List<String> localPaths) async {
+    final uri = Uri.parse('${AppConstants.chatbotApi}/upload-images');
+    final imagesBase64 = <String>[];
+    for (final path in localPaths) {
+      if (kIsWeb) {
+        imagesBase64.add(path);
+      } else {
+        final bytes = await File(path).readAsBytes();
+        imagesBase64.add(base64Encode(bytes));
+      }
+    }
+    final response = await http.post(
+      uri,
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'images': imagesBase64}),
+    );
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      return List<String>.from(data['urls']);
+    }
+    throw Exception('Error al subir imágenes: ${response.statusCode}');
   }
 }

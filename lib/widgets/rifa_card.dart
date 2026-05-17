@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:google_fonts/google_fonts.dart';
@@ -305,9 +306,17 @@ class _RifaCardState extends State<RifaCard> with SingleTickerProviderStateMixin
         errorBuilder: (context, error, stackTrace) => const Center(child: Icon(Icons.broken_image, color: Colors.white24)),
       );
     }
+
+    if (path.startsWith('data:image/')) {
+      final base64 = path.contains('base64,') ? path.split('base64,')[1] : path;
+      return Image.memory(
+        base64Decode(base64),
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) => const Center(child: Icon(Icons.broken_image, color: Colors.white24)),
+      );
+    }
     
     if (kIsWeb) {
-      // En Web, si no es una URL/Blob, no podemos cargarla como File
       return const Center(child: Icon(Icons.broken_image, color: Colors.white24));
     }
 
