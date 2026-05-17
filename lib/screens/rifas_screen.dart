@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../config/theme.dart';
@@ -156,8 +157,8 @@ class _RifasActivasTab extends StatelessWidget {
               child: RifaCard(
                 rifa: rifa,
                 showDetails: true,
-                onEdit: provider.isAdmin ? () => _showEditDialog(context, rifa, provider) : null,
-                onDelete: provider.isAdmin ? () => _confirmDeleteRifa(context, rifa, provider) : null,
+                onEdit: () => _showEditDialog(context, rifa, provider),
+                onDelete: () => _confirmDeleteRifa(context, rifa, provider),
                 onTap: () {
                   provider.setRifaSeleccionada(rifa);
                   Navigator.push(
@@ -176,7 +177,96 @@ class _RifasActivasTab extends StatelessWidget {
   }
 
   void _showEditDialog(BuildContext context, Rifa rifa, RifaProvider provider) {
-    // Reutilizar el diálogo de edición ya definido
+    final nombreController = TextEditingController(text: rifa.nombre);
+    final descripcionController = TextEditingController(text: rifa.descripcion);
+    final precioController = TextEditingController(text: rifa.precioNumero.toString());
+    String? selectedLoteria = rifa.loteria;
+    String? selectedDia = rifa.diaSorteo;
+    DateTime? selectedFecha = rifa.fechaSorteo;
+
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          title: const Text('Editar Rifa'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: nombreController,
+                  decoration: const InputDecoration(labelText: 'Nombre'),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: descripcionController,
+                  decoration: const InputDecoration(labelText: 'Descripción'),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: precioController,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(labelText: 'Precio'),
+                ),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<String>(
+                  initialValue: selectedLoteria,
+                  decoration: const InputDecoration(labelText: 'Lotería'),
+                  items: LoteriasColombia.principales.map((l) => DropdownMenuItem(value: l, child: Text(l))).toList(),
+                  onChanged: (val) => setState(() => selectedLoteria = val),
+                ),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<String>(
+                  initialValue: selectedDia,
+                  decoration: const InputDecoration(labelText: 'Día de Sorteo'),
+                  items: LoteriasColombia.diasSemana.map((d) => DropdownMenuItem(value: d, child: Text(d))).toList(),
+                  onChanged: (val) => setState(() => selectedDia = val),
+                ),
+                const SizedBox(height: 12),
+                ListTile(
+                  title: const Text('Fecha de Sorteo'),
+                  subtitle: Text(selectedFecha != null ? DateFormat('dd/MM/yyyy').format(selectedFecha!) : 'No seleccionada'),
+                  trailing: const Icon(Icons.calendar_today),
+                  onTap: () async {
+                    final picked = await showDatePicker(
+                      context: context,
+                      initialDate: selectedFecha ?? DateTime.now(),
+                      firstDate: DateTime.now().subtract(const Duration(days: 365)),
+                      lastDate: DateTime.now().add(const Duration(days: 365)),
+                    );
+                    if (picked != null) setState(() => selectedFecha = picked);
+                  },
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancelar'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                final updatedRifa = rifa.copyWith(
+                  nombre: nombreController.text,
+                  descripcion: descripcionController.text,
+                  precioNumero: double.tryParse(precioController.text) ?? rifa.precioNumero,
+                  loteria: selectedLoteria,
+                  diaSorteo: selectedDia,
+                  fechaSorteo: selectedFecha,
+                );
+                provider.actualizarRifa(updatedRifa);
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Rifa actualizada')),
+                );
+              },
+              child: const Text('Guardar'),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   void _confirmDeleteRifa(BuildContext context, Rifa rifa, RifaProvider provider) {
@@ -284,7 +374,6 @@ class _RifaDetalleScreenState extends State<_RifaDetalleScreen> {
 
     if (rifa == null) return const Scaffold(body: Center(child: Text('Error: No hay rifa')));
 
-    final stats = provider.getEstadisticas();
     final filteredParticipantes = provider.participantes.where((p) {
       return p.nombre.toLowerCase().contains(_searchQuery.toLowerCase()) ||
              p.whatsapp.contains(_searchQuery) ||
@@ -296,7 +385,19 @@ class _RifaDetalleScreenState extends State<_RifaDetalleScreen> {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          _buildStatsGrid(stats),
+          FutureBuilder<Map<String, dynamic>>(
+            future: provider.getEstadisticasForRifa(rifa.id, rifa.precioNumero),
+            builder: (context, snapshot) {
+              final stats = snapshot.data ?? {
+                'totalVendidos': 0, 'totalDisponibles': 0,
+                'totalVendido': 0.0, 'pendientePago': 0.0,
+                'numerosPagados': 0, 'numerosReservados': 0,
+                'participantesPagados': 0, 'participantesPendientes': 0,
+                'participantesAbonados': 0,
+              };
+              return _buildStatsGrid(stats);
+            },
+          ),
           const SizedBox(height: 24),
           _buildSearchAndTitle(provider),
           const SizedBox(height: 16),
@@ -308,17 +409,19 @@ class _RifaDetalleScreenState extends State<_RifaDetalleScreen> {
 
   Widget _buildStatsGrid(Map<String, dynamic> stats) {
     return GridView.count(
-      crossAxisCount: 2,
+      crossAxisCount: 3,
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
-      mainAxisSpacing: 12,
-      crossAxisSpacing: 12,
-      childAspectRatio: 1.5,
+      mainAxisSpacing: 8,
+      crossAxisSpacing: 8,
+      childAspectRatio: 1.1,
       children: [
         _buildStatCard(icon: Icons.sell, value: '${stats['totalVendidos']}', label: 'Vendidos', color: AppTheme.primaryColor),
         _buildStatCard(icon: Icons.inventory_2, value: '${stats['totalDisponibles']}', label: 'Disponibles', color: AppTheme.secondaryColor),
-        _buildStatCard(icon: Icons.payments, value: AppConstants.formatCurrencyCOP(stats['totalVendido'] ?? 0), label: 'Vendido', color: AppTheme.primaryColor),
-        _buildStatCard(icon: Icons.pending, value: AppConstants.formatCurrencyCOP(stats['pendientePago'] ?? 0), label: 'Pendiente', color: Colors.orange),
+        _buildStatCard(icon: Icons.check_circle, value: '${stats['participantesPagados']}', label: 'Pagados', color: Colors.green),
+        _buildStatCard(icon: Icons.pending, value: '${stats['participantesPendientes']}', label: 'Pendientes', color: Colors.orange),
+        _buildStatCard(icon: Icons.payment, value: '${stats['participantesAbonados']}', label: 'Abonados', color: Colors.purple),
+        _buildStatCard(icon: Icons.payments, value: AppConstants.formatCurrencyCOP(stats['totalVendido'] ?? 0), label: 'Recaudado', color: AppTheme.primaryColor),
       ],
     );
   }
@@ -390,7 +493,30 @@ class _RifaDetalleScreenState extends State<_RifaDetalleScreen> {
       itemBuilder: (context, index) {
         final p = participantes[index];
         final isPaid = p.estadoPago == EstadoPago.pagado;
-        
+        final isAbonado = p.estadoPago == EstadoPago.abonado;
+
+        Color statusColor;
+        String statusLabel;
+        if (isPaid) {
+          statusColor = AppTheme.secondaryColor;
+          statusLabel = 'PAGADO';
+        } else if (isAbonado) {
+          statusColor = Colors.purple;
+          statusLabel = 'ABONADO';
+        } else {
+          statusColor = AppTheme.errorColor;
+          statusLabel = 'PENDIENTE';
+        }
+
+        Color numeroColor;
+        if (isPaid) {
+          numeroColor = AppTheme.numeroPagado;
+        } else if (isAbonado) {
+          numeroColor = Colors.purple;
+        } else {
+          numeroColor = AppTheme.numeroReservado;
+        }
+
         return Card(
           margin: const EdgeInsets.only(bottom: 12),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -414,10 +540,10 @@ class _RifaDetalleScreenState extends State<_RifaDetalleScreen> {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                       decoration: BoxDecoration(
-                        color: (isPaid ? AppTheme.secondaryColor : AppTheme.errorColor).withValues(alpha: 0.15),
+                        color: statusColor.withValues(alpha: 0.15),
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      child: Text(isPaid ? 'PAGADO' : 'PENDIENTE', style: TextStyle(color: isPaid ? AppTheme.secondaryColor : AppTheme.errorColor, fontSize: 10, fontWeight: FontWeight.bold)),
+                      child: Text(statusLabel, style: TextStyle(color: statusColor, fontSize: 10, fontWeight: FontWeight.bold)),
                     ),
                   ],
                 ),
@@ -427,27 +553,37 @@ class _RifaDetalleScreenState extends State<_RifaDetalleScreen> {
                   children: p.numeros.map((n) => Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
-                      color: (isPaid ? AppTheme.numeroPagado : AppTheme.numeroReservado).withValues(alpha: 0.1),
+                      color: numeroColor.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(6),
-                      border: Border.all(color: (isPaid ? AppTheme.numeroPagado : AppTheme.numeroReservado).withValues(alpha: 0.3)),
+                      border: Border.all(color: numeroColor.withValues(alpha: 0.3)),
                     ),
-                    child: Text(n, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: isPaid ? AppTheme.numeroPagado : AppTheme.numeroReservado)),
+                    child: Text(n, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: numeroColor)),
                   )).toList(),
                 ),
+                const SizedBox(height: 10),
+                _buildAbonosSection(p, rifa),
                 const Divider(height: 24),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.end,
                   children: [
-                    _buildIconAction(icon: Icons.delete_outline, color: AppTheme.errorColor, onTap: () => _confirmDelete(p, provider)),
-                    const SizedBox(width: 8),
+                    if (provider.isAdmin)
+                      _buildIconAction(icon: Icons.delete_outline, color: AppTheme.errorColor, onTap: () => _confirmDelete(p, provider)),
+                    if (provider.isAdmin) const SizedBox(width: 8),
                     _buildIconAction(icon: Icons.message_outlined, color: Colors.green, onTap: () => _contactWhatsApp(p, rifa)),
                     const SizedBox(width: 8),
                     _buildIconAction(
-                      icon: Icons.confirmation_number_outlined, 
-                      color: AppTheme.primaryColor, 
+                      icon: Icons.confirmation_number_outlined,
+                      color: AppTheme.primaryColor,
                       onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => TicketScreen(participante: p, rifa: rifa)))
                     ),
                     const SizedBox(width: 8),
+                    if (!isPaid)
+                      _buildIconAction(
+                        icon: Icons.add_card_rounded,
+                        color: Colors.purple,
+                        onTap: () => _showAbonoDialog(context, p, provider, rifa),
+                      ),
+                    if (!isPaid) const SizedBox(width: 8),
                     Expanded(
                       child: !isPaid
                         ? ElevatedButton.icon(
@@ -493,6 +629,213 @@ class _RifaDetalleScreenState extends State<_RifaDetalleScreen> {
         actions: [
           TextButton(onPressed: () => Navigator.pop(context), child: const Text('CANCELAR')),
           ElevatedButton(onPressed: () { onConfirm(); Navigator.pop(context); }, child: const Text('CONFIRMAR')),
+        ],
+      ),
+    );
+  }
+
+  void _showAbonoDialog(BuildContext ctx, Participante p, RifaProvider provider, Rifa rifa) {
+    final precioTotal = p.numeros.length * rifa.precioNumero;
+    final montoController = TextEditingController();
+    final notaController = TextEditingController();
+    String metodoPago = 'efectivo';
+
+    showDialog(
+      context: ctx,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) {
+          final faltante = precioTotal - p.totalPagado;
+
+          return AlertDialog(
+            title: Column(
+              children: [
+                const Text('Registrar Abono'),
+                Text(p.nombre, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.normal)),
+              ],
+            ),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: AppTheme.surfaceColor,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Column(
+                      children: [
+                        _buildInfoRow('Total rifa', AppConstants.formatCurrencyCOP(precioTotal)),
+                        _buildInfoRow('Abonado', AppConstants.formatCurrencyCOP(p.totalPagado)),
+                        _buildInfoRow('Saldo', AppConstants.formatCurrencyCOP(faltante), color: AppTheme.errorColor),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: montoController,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(
+                      labelText: 'Monto',
+                      prefixText: '\$ ',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  DropdownButtonFormField<String>(
+                    initialValue: metodoPago,
+                    decoration: const InputDecoration(
+                      labelText: 'Método de pago',
+                      border: OutlineInputBorder(),
+                    ),
+                    items: ['efectivo', 'transferencia', 'datáfono', 'bizum', 'otro']
+                        .map((e) => DropdownMenuItem(value: e, child: Text(e.toString())))
+                        .toList(),
+                    onChanged: (v) => setState(() => metodoPago = v!),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: notaController,
+                    maxLines: 2,
+                    decoration: const InputDecoration(
+                      labelText: 'Nota (opcional)',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.purple),
+                onPressed: () async {
+                  final monto = double.tryParse(montoController.text.trim());
+                  if (monto == null || monto <= 0) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Ingrese un monto válido'), backgroundColor: AppTheme.errorColor),
+                    );
+                    return;
+                  }
+                  if (monto > faltante) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('El abono no puede superar el saldo pendiente'), backgroundColor: AppTheme.errorColor),
+                    );
+                    return;
+                  }
+                  final navigator = Navigator.of(context, rootNavigator: true);
+                  navigator.pop();
+                  await provider.registrarAbono(
+                    participanteId: p.id,
+                    monto: monto,
+                    nota: notaController.text.isNotEmpty ? notaController.text : null,
+                    metodoPago: metodoPago,
+                    rifaId: rifa.id,
+                    precioNumero: rifa.precioNumero,
+                  );
+                  if (!ctx.mounted) return;
+                  ScaffoldMessenger.of(ctx).showSnackBar(
+                    SnackBar(content: Text('Abono de \$${monto.toStringAsFixed(0)} registrado'), backgroundColor: Colors.purple),
+                  );
+                },
+                child: const Text('Registrar Abono'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildInfoRow(String label, String value, {Color? color}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label, style: TextStyle(color: AppTheme.textSecondary, fontSize: 13)),
+          Text(value, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: color)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAbonosSection(Participante p, Rifa rifa) {
+    final precioTotal = p.numeros.length * rifa.precioNumero;
+    final saldo = precioTotal - p.totalPagado;
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppTheme.surfaceColor,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppTheme.dividerColor),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('Abonos', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppTheme.textSecondary)),
+              Text('Total: ${AppConstants.formatCurrencyCOP(p.totalPagado)}',
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.purple)),
+            ],
+          ),
+          if (p.abonos.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            ...p.abonos.map((a) => Padding(
+              padding: const EdgeInsets.only(bottom: 6),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: [
+                      Icon(Icons.payment, size: 14, color: Colors.purple),
+                      const SizedBox(width: 6),
+                      Text(DateFormat('dd/MM').format(a.fecha),
+                          style: TextStyle(fontSize: 12, color: AppTheme.textSecondary)),
+                      const SizedBox(width: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: Colors.purple.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(a.metodoPago,
+                            style: TextStyle(fontSize: 9, color: Colors.purple, fontWeight: FontWeight.bold)),
+                      ),
+                      if (a.nota != null && a.nota!.isNotEmpty) ...[
+                        const SizedBox(width: 4),
+                        Icon(Icons.notes, size: 12, color: AppTheme.textSecondary),
+                      ],
+                    ],
+                  ),
+                  Text(AppConstants.formatCurrencyCOP(a.monto),
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                ],
+              ),
+            )),
+          ] else ...[
+            const SizedBox(height: 8),
+            Text('Sin abonos registrados', style: TextStyle(fontSize: 11, color: AppTheme.textSecondary)),
+          ],
+          const Divider(height: 12),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('Saldo pendiente', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+              Text(
+                AppConstants.formatCurrencyCOP(saldo),
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 13,
+                  color: saldo > 0 ? AppTheme.errorColor : AppTheme.secondaryColor,
+                ),
+              ),
+            ],
+          ),
         ],
       ),
     );

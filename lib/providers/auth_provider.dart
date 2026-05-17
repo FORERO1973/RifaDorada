@@ -44,6 +44,9 @@ class AuthProvider extends ChangeNotifier {
 
       if (firebaseUser != null) {
         await _loadUserData(firebaseUser.uid);
+        if (_currentUser == null) {
+          _error = '⚠️ Sesión no válida. Por favor inicia sesión de nuevo.';
+        }
       } else {
         _currentUser = null;
         _currentOrg = null;
@@ -60,8 +63,20 @@ class AuthProvider extends ChangeNotifier {
       final doc = await _firestore.collection('users').doc(uid).get();
       if (doc.exists) {
         _currentUser = UserModel.fromMap(doc.data()!, doc.id);
+
         if (_currentUser!.organizacionId != null) {
-          await _loadOrgData(_currentUser!.organizacionId!);
+          final orgDoc = await _firestore.collection('organizaciones').doc(_currentUser!.organizacionId!).get();
+          if (orgDoc.exists) {
+            final orgData = orgDoc.data()!;
+            if (orgData['activa'] == false) {
+              _currentUser = null;
+              _currentOrg = null;
+              _error = '⚠️ Organización suspendida. Contacta al administrador.';
+              notifyListeners();
+              return;
+            }
+            _currentOrg = Organizacion.fromMap(orgData, orgDoc.id);
+          }
         }
       } else {
         _currentUser = null;
@@ -91,8 +106,17 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      await _auth.signInWithEmailAndPassword(email: email, password: password);
-      return true;
+      final cred = await _auth.signInWithEmailAndPassword(email: email, password: password);
+      if (cred.user != null) {
+        await _loadUserData(cred.user!.uid);
+        if (_currentUser == null) {
+          await _auth.signOut();
+          _error = '⚠️ Usuario no encontrado en la base de datos. Contacta al administrador.';
+        }
+      }
+      _isLoading = false;
+      notifyListeners();
+      return _currentUser != null;
     } on FirebaseAuthException catch (e) {
       _error = _mapAuthError(e.code);
       _isLoading = false;
@@ -110,49 +134,61 @@ class AuthProvider extends ChangeNotifier {
     required String nombre,
     required String email,
     required String password,
-    required String orgNombre,
-    String? orgTelefono,
-    String? orgEmail,
+    String? orgNombre,
   }) async {
     _isLoading = true;
     _error = null;
     notifyListeners();
 
     try {
+      final superSnapshot = await _firestore
+          .collection('users')
+          .where('rol', isEqualTo: 'superAdmin')
+          .limit(1)
+          .get();
+
       final cred = await _auth.createUserWithEmailAndPassword(
         email: email,
         password: password,
       );
       final uid = cred.user!.uid;
 
-      final orgId = _firestore.collection('organizaciones').doc().id;
-      final org = Organizacion(
-        id: orgId,
-        nombre: orgNombre,
-        telefono: orgTelefono,
-        email: orgEmail,
-        fechaCreacion: DateTime.now(),
-        creadoPor: uid,
-      );
-          await _firestore.collection('organizaciones').doc(orgId).set(org.toMap());
-          await _migrateExistingData(orgId, uid);
+      UserModel user;
+      if (superSnapshot.docs.isEmpty) {
+        user = UserModel(
+          uid: uid,
+          email: email,
+          nombre: nombre,
+          rol: UserRol.superAdmin,
+          fechaCreacion: DateTime.now(),
+          ultimoAcceso: DateTime.now(),
+        );
+      } else {
+        final orgId = _firestore.collection('organizaciones').doc().id;
+        final org = Organizacion(
+          id: orgId,
+          nombre: orgNombre ?? 'Nueva Organización',
+          fechaCreacion: DateTime.now(),
+          creadoPor: uid,
+        );
+        await _firestore.collection('organizaciones').doc(orgId).set(org.toMap());
 
-      final user = UserModel(
-        uid: uid,
-        email: email,
-        nombre: nombre,
-        rol: UserRol.orgAdmin,
-        organizacionId: orgId,
-        fechaCreacion: DateTime.now(),
-        ultimoAcceso: DateTime.now(),
-      );
+        user = UserModel(
+          uid: uid,
+          email: email,
+          nombre: nombre,
+          rol: UserRol.orgAdmin,
+          organizacionId: orgId,
+          fechaCreacion: DateTime.now(),
+          ultimoAcceso: DateTime.now(),
+        );
+        _currentOrg = org;
+      }
+
       await _firestore.collection('users').doc(uid).set(user.toMap());
-
       _currentUser = user;
-      _currentOrg = org;
       _isLoading = false;
       notifyListeners();
-
       return (null, user);
     } on FirebaseAuthException catch (e) {
       _error = _mapAuthError(e.code);
@@ -180,6 +216,105 @@ class AuthProvider extends ChangeNotifier {
       return snapshot.docs.isNotEmpty;
     } catch (e) {
       return true;
+    }
+  }
+
+  Future<Organizacion?> crearOrganizacion({
+    required String nombreOrg,
+    required String emailAdmin,
+    required String nombreAdmin,
+    required String passwordTemp,
+    String? nit,
+  }) async {
+    try {
+      final cred = await _auth.createUserWithEmailAndPassword(
+        email: emailAdmin,
+        password: passwordTemp,
+      );
+      final uid = cred.user!.uid;
+
+      final orgId = _firestore.collection('organizaciones').doc().id;
+      final org = Organizacion(
+        id: orgId,
+        nombre: nombreOrg,
+        nit: nit,
+        fechaCreacion: DateTime.now(),
+        creadoPor: _currentUser?.uid ?? uid,
+      );
+      await _firestore.collection('organizaciones').doc(orgId).set(org.toMap());
+
+      final admin = UserModel(
+        uid: uid,
+        email: emailAdmin,
+        nombre: nombreAdmin,
+        rol: UserRol.orgAdmin,
+        organizacionId: orgId,
+        fechaCreacion: DateTime.now(),
+      );
+      await _firestore.collection('users').doc(uid).set(admin.toMap());
+
+      return org;
+    } catch (e) {
+      debugPrint('[AUTH] Error creating organization: $e');
+      return null;
+    }
+  }
+
+  Future<List<Organizacion>> getAllOrganizaciones() async {
+    try {
+      final snapshot = await _firestore
+          .collection('organizaciones')
+          .orderBy('fechaCreacion', descending: true)
+          .get();
+      return snapshot.docs
+          .map((doc) => Organizacion.fromMap(doc.data(), doc.id))
+          .toList();
+    } catch (e) {
+      debugPrint('[AUTH] Error fetching organizaciones: $e');
+      return [];
+    }
+  }
+
+  Future<bool> toggleOrgActive(String orgId, bool active) async {
+    try {
+      await _firestore.collection('organizaciones').doc(orgId).update({'activa': active});
+      return true;
+    } catch (e) {
+      debugPrint('[AUTH] Error toggling org: $e');
+      return false;
+    }
+  }
+
+  Future<bool> deleteOrganizacion(String orgId) async {
+    try {
+      final usersSnap = await _firestore
+          .collection('users')
+          .where('organizacionId', isEqualTo: orgId)
+          .get();
+      for (final userDoc in usersSnap.docs) {
+        await userDoc.reference.delete();
+      }
+
+      await _firestore.collection('organizaciones').doc(orgId).delete();
+      return true;
+    } catch (e) {
+      debugPrint('[AUTH] Error deleting organization: $e');
+      return false;
+    }
+  }
+
+  Future<List<UserModel>> getUsersByOrg(String orgId) async {
+    try {
+      final snapshot = await _firestore
+          .collection('users')
+          .where('organizacionId', isEqualTo: orgId)
+          .get();
+      return snapshot.docs
+          .map((doc) => UserModel.fromMap(doc.data(), doc.id))
+          .toList();
+    } catch (e) {
+      debugPrint('[AUTH] Error fetching users: $e');
+      return [];
     }
   }
 

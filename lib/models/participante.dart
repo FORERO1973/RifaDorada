@@ -1,3 +1,12 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+
+DateTime _parseDateTime(dynamic value) {
+  if (value == null) return DateTime.now();
+  if (value is DateTime) return value;
+  if (value is Timestamp) return value.toDate();
+  return DateTime.parse(value.toString());
+}
+
 enum EstadoPago { pendiente, pagado, abonado }
 
 class Abono {
@@ -18,7 +27,7 @@ class Abono {
   factory Abono.fromMap(Map<String, dynamic> map, String id) {
     return Abono(
       id: id,
-      fecha: map['fecha'] != null ? DateTime.parse(map['fecha']) : DateTime.now(),
+      fecha: _parseDateTime(map['fecha']),
       monto: (map['monto'] ?? 0).toDouble(),
       nota: map['nota'],
       metodoPago: map['metodoPago'] ?? 'efectivo',
@@ -55,7 +64,7 @@ class HistorialCambio {
   factory HistorialCambio.fromMap(Map<String, dynamic> map, String id) {
     return HistorialCambio(
       id: id,
-      fecha: map['fecha'] != null ? DateTime.parse(map['fecha']) : DateTime.now(),
+      fecha: _parseDateTime(map['fecha']),
       tipo: map['tipo'] ?? '',
       descripcion: map['descripcion'] ?? '',
       valorAnterior: map['valorAnterior'],
@@ -145,9 +154,7 @@ class Participante {
           : map['estadoPago'] == 'abonado'
               ? EstadoPago.abonado
               : EstadoPago.pendiente,
-      fechaRegistro: (map['fechaRegistro'] != null)
-          ? DateTime.parse(map['fechaRegistro'])
-          : DateTime.now(),
+      fechaRegistro: _parseDateTime(map['fechaRegistro']),
       totalPagado: (map['totalPagado'] ?? 0).toDouble(),
       notas: map['notas'],
       abonos: abonosList,

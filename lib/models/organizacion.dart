@@ -1,3 +1,12 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+
+DateTime _parseDateTime(dynamic value) {
+  if (value == null) return DateTime.now();
+  if (value is DateTime) return value;
+  if (value is Timestamp) return value.toDate();
+  return DateTime.parse(value.toString());
+}
+
 class Organizacion {
   final String id;
   final String nombre;
@@ -11,6 +20,7 @@ class Organizacion {
   final String creadoPor;
   final String metodoPago;
   final String numeroCuenta;
+  final String? responsable;
 
   Organizacion({
     required this.id,
@@ -25,6 +35,7 @@ class Organizacion {
     required this.creadoPor,
     this.metodoPago = 'nequi',
     this.numeroCuenta = '',
+    this.responsable,
   });
 
   factory Organizacion.fromMap(Map<String, dynamic> map, String id) {
@@ -37,12 +48,11 @@ class Organizacion {
       direccion: map['direccion'],
       logo: map['logo'],
       activa: map['activa'] ?? true,
-      fechaCreacion: map['fechaCreacion'] != null
-          ? DateTime.parse(map['fechaCreacion'])
-          : DateTime.now(),
+      fechaCreacion: _parseDateTime(map['fechaCreacion']),
       creadoPor: map['creadoPor'] ?? '',
       metodoPago: map['metodoPago'] ?? 'nequi',
       numeroCuenta: map['numeroCuenta'] ?? '',
+      responsable: map['responsable'],
     );
   }
 
@@ -59,6 +69,7 @@ class Organizacion {
       'creadoPor': creadoPor,
       'metodoPago': metodoPago,
       'numeroCuenta': numeroCuenta,
+      'responsable': responsable,
     };
   }
 
@@ -75,6 +86,7 @@ class Organizacion {
     String? creadoPor,
     String? metodoPago,
     String? numeroCuenta,
+    String? responsable,
   }) {
     return Organizacion(
       id: id ?? this.id,
@@ -89,6 +101,7 @@ class Organizacion {
       creadoPor: creadoPor ?? this.creadoPor,
       metodoPago: metodoPago ?? this.metodoPago,
       numeroCuenta: numeroCuenta ?? this.numeroCuenta,
+      responsable: responsable ?? this.responsable,
     );
   }
 }

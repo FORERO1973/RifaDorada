@@ -33,15 +33,34 @@ class _TicketScreenState extends State<TicketScreen> {
   final ScreenshotController _screenshotController = ScreenshotController();
   bool _autoSent = false;
   bool _isAutoSending = false;
+  String? _orgResponsable;
+  String? _orgCuenta;
+  String? _orgMetodoPago;
 
   @override
   void initState() {
     super.initState();
+    _loadOrgConfig();
     if (widget.autoSend) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _autoSendTicket();
       });
     }
+  }
+
+  Future<void> _loadOrgConfig() async {
+    final orgId = widget.rifa.organizacionId;
+    if (orgId == null) return;
+    try {
+      final config = await FirebaseService.instance.getAppConfig(organizacionId: orgId);
+      if (config != null && mounted) {
+        setState(() {
+          _orgResponsable = config.responsable.isNotEmpty ? config.responsable : null;
+          _orgCuenta = config.numeroCuenta.isNotEmpty ? config.numeroCuenta : null;
+          _orgMetodoPago = config.metodoPago;
+        });
+      }
+    } catch (_) {}
   }
 
   Future<void> _autoSendTicket() async {
@@ -434,11 +453,24 @@ class _TicketScreenState extends State<TicketScreen> {
             ),
             child: Column(
               children: [
-                if (widget.rifa.responsable != null)
+                if (_orgResponsable != null)
                   Padding(
                     padding: const EdgeInsets.only(bottom: 4),
                     child: Text(
-                      'RESPONSABLE: ${widget.rifa.responsable} ${widget.rifa.contactoResponsable != null ? "(${widget.rifa.contactoResponsable})" : ""}',
+                      'RESPONSABLE: $_orgResponsable',
+                      textAlign: TextAlign.center,
+                      style: GoogleFonts.outfit(
+                        fontSize: 9,
+                        fontWeight: FontWeight.bold,
+                        color: AppTheme.textSecondary.withValues(alpha: 0.8),
+                      ),
+                    ),
+                  ),
+                if (_orgCuenta != null)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 4),
+                    child: Text(
+                      'Pagos: $_orgCuenta (${_orgMetodoPago?.toUpperCase() ?? ''})',
                       textAlign: TextAlign.center,
                       style: GoogleFonts.outfit(
                         fontSize: 9,

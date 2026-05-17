@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../config/theme.dart';
 import '../providers/auth_provider.dart';
 
@@ -20,6 +21,22 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _confirmPasswordController = TextEditingController();
   bool _obscurePassword = true;
   bool _obscureConfirm = true;
+  bool? _esSuperAdmin; // null = checking, true = no superAdmin exists
+
+  @override
+  void initState() {
+    super.initState();
+    _checkSuperAdmin();
+  }
+
+  Future<void> _checkSuperAdmin() async {
+    final usersSnap = await FirebaseFirestore.instance
+        .collection('users')
+        .where('rol', isEqualTo: 'superAdmin')
+        .limit(1)
+        .get();
+    if (mounted) setState(() => _esSuperAdmin = usersSnap.docs.isEmpty);
+  }
 
   @override
   void dispose() {
@@ -71,8 +88,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       return const SizedBox.shrink();
                     },
                   ),
-                  _buildField(_orgController, 'Nombre de la Organización', Icons.business, 'Ej: RifaDorada SAS'),
-                  const SizedBox(height: 16),
+                  if (_esSuperAdmin == true)
+                    Text('Registro como SuperAdmin', style: TextStyle(color: Colors.amber, fontWeight: FontWeight.bold, fontSize: 13))
+                  else if (_esSuperAdmin == false) ...[
+                    _buildField(_orgController, 'Nombre de la Organización', Icons.business, 'Ej: RifaDorada SAS'),
+                    const SizedBox(height: 16),
+                  ],
+                  if (_esSuperAdmin == null)
+                    const Center(child: Padding(padding: EdgeInsets.all(16), child: CircularProgressIndicator(strokeWidth: 2))),
                   _buildField(_nombreController, 'Tu Nombre', Icons.person, 'Ej: Juan Pérez'),
                   const SizedBox(height: 16),
                   _buildField(_emailController, 'Correo Electrónico', Icons.email, 'ejemplo@correo.com', TextInputType.emailAddress),
@@ -114,7 +137,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
         ),
         const SizedBox(height: 8),
         Text(
-          'Registra tu organización y conviértete en administrador',
+          _esSuperAdmin == true
+              ? 'Crea la cuenta SuperAdmin para gestionar todas las organizaciones'
+              : 'Registra tu organización y conviértete en administrador',
           style: Theme.of(context).textTheme.bodyMedium,
           textAlign: TextAlign.center,
         ),
@@ -236,13 +261,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
       nombre: _nombreController.text.trim(),
       email: _emailController.text.trim(),
       password: _passwordController.text,
-      orgNombre: _orgController.text.trim(),
+      orgNombre: _esSuperAdmin == true ? null : _orgController.text.trim(),
     );
 
     if (mounted && error == null && user != null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('✅ Cuenta creada exitosamente. ¡Bienvenido!'),
+        SnackBar(
+          content: Text(_esSuperAdmin == true
+              ? '✅ SuperAdmin creado. Ahora crea organizaciones desde el panel.'
+              : '✅ Cuenta creada exitosamente. ¡Bienvenido!'),
           backgroundColor: AppTheme.secondaryColor,
         ),
       );

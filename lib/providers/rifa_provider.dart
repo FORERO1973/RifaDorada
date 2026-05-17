@@ -40,6 +40,11 @@ class RifaProvider extends ChangeNotifier {
   List<Participante> _participantes = [];
   List<Participante> get participantes => _participantes;
 
+  void setParticipantes(List<Participante> list) {
+    _participantes = list;
+    notifyListeners();
+  }
+
   Map<String, Numero> _numeros = {};
   Map<String, Numero> get numeros => _numeros;
 
@@ -357,6 +362,7 @@ class RifaProvider extends ChangeNotifier {
         total: precioTotal.toDouble(),
         totalPagado: nuevoTotalPagado,
         abonos: abonosMap,
+        organizacionId: _organizacionId,
       );
 
       if (nuevoEstado == EstadoPago.pagado && participante.estadoPago != EstadoPago.pagado) {
@@ -448,6 +454,7 @@ class RifaProvider extends ChangeNotifier {
           total: precioTotal.toDouble(),
           totalPagado: precioTotal.toDouble(),
           abonos: abonosMap,
+          organizacionId: _organizacionId,
         );
       }
       
@@ -491,40 +498,66 @@ Map<String, dynamic> getEstadisticas() {
         'pendientePago': 0.0,
         'participantesPagados': 0,
         'participantesPendientes': 0,
+        'participantesAbonados': 0,
       };
     }
 
     final vendidos = _numeros.values.where((n) => n.estaOcupado || n.estaPagado || n.estaReservado).length;
-    // Cálculo corregido basado en la cantidad total de la rifa
     final disponibles = _rifaSeleccionada!.cantidadNumeros - vendidos;
     final pagadosCount = _numeros.values.where((n) => n.estaPagado).length;
     final reservadosCount = _numeros.values.where((n) => n.estaReservado).length;
     
-    final totalVendido = pagadosCount * _rifaSeleccionada!.precioNumero;
-    final pendientePago = reservadosCount * _rifaSeleccionada!.precioNumero;
+    int pPagados = 0, pAbonados = 0, pPendientes = 0;
+    double totalRecaudado = 0;
+    for (final p in _participantes) {
+      totalRecaudado += p.totalPagado;
+      if (p.estaPagado) {
+        pPagados++;
+      } else if (p.estaAbonado) {
+        pAbonados++;
+      } else {
+        pPendientes++;
+      }
+    }
+
+    double pendientePago = 0;
+    for (final p in _participantes) {
+      final precioTotal = p.numeros.length * _rifaSeleccionada!.precioNumero;
+      if (p.totalPagado < precioTotal) {
+        pendientePago += precioTotal - p.totalPagado;
+      }
+    }
 
     return {
       'totalVendidos': vendidos,
       'totalDisponibles': disponibles,
-      'totalVendido': totalVendido,
+      'totalVendido': totalRecaudado,
       'pendientePago': pendientePago,
       'numerosPagados': pagadosCount,
       'numerosReservados': reservadosCount,
+      'participantesPagados': pPagados,
+      'participantesPendientes': pPendientes,
+      'participantesAbonados': pAbonados,
     };
   }
 
-  Map<String, dynamic> getEstadisticasForRifa(String rifaId, double precioNumero) {
-    // Si es la rifa seleccionada, usamos los datos en tiempo real
+  Future<Map<String, dynamic>> getEstadisticasForRifa(String rifaId, double precioNumero) async {
     if (_rifaSeleccionada?.id == rifaId) {
       return getEstadisticas();
     }
-    
-    // Si no, recurrimos al servicio (aunque lo ideal sería tener todos cargados)
-    return _firebaseService.getEstadisticas(rifaId, precioNumero);
+    return _firebaseService.getFirebaseRifaStats(rifaId, precioNumero);
+  }
+
+  Future<Map<String, dynamic>> getVendedorStats() async {
+    return _firebaseService.getFirebaseVendedorStats(organizacionId: _organizacionId);
+  }
+
+  Future<Map<String, dynamic>> getPaymentMethodStats(String rifaId) async {
+    return _firebaseService.getPaymentMethodStats(rifaId);
   }
 
 
-  Future<void> exportarDatosCSV({String? rifaId, String? nombreRifa}) async {
+  Future<void> exportarDatosCSV({String? rifaId, String? nombreRifa, String? vendedorId, String? vendedorNombre}) async {
     final rid = rifaId ?? _rifaSeleccionada?.id;
     final rName = nombreRifa ?? _rifaSeleccionada?.nombre ?? 'Rifa';
     if (rid == null) return;
@@ -533,7 +566,7 @@ Map<String, dynamic> getEstadisticas() {
       _isLoading = true;
       notifyListeners();
 
-      final csvContent = await _firebaseService.exportarDatosCSV(rid, rName);
+      final csvContent = await _firebaseService.exportarDatosCSV(rid, rName, vendedorId: vendedorId);
 
       if (csvContent.isEmpty) {
         _error = 'No hay participantes registrados en esta rifa para exportar.';
@@ -542,7 +575,8 @@ Map<String, dynamic> getEstadisticas() {
 
       final directory = await getTemporaryDirectory();
       final dateStr = DateFormat('yyyyMMdd_HHmm').format(DateTime.now());
-      final fileName = 'Reporte_${rName.replaceAll(' ', '_')}_$dateStr.csv';
+      final vName = vendedorNombre != null ? '_${vendedorNombre.replaceAll(' ', '_')}' : '';
+      final fileName = 'Reporte_${rName.replaceAll(' ', '_')}${vName}_$dateStr.csv';
       final filePath = '${directory.path}/$fileName';
       
       final file = File(filePath);

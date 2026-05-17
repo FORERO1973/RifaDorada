@@ -1,3 +1,5 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 enum UserRol { superAdmin, orgAdmin, vendedor }
 
 class UserModel {
@@ -32,12 +34,8 @@ class UserModel {
       rol: _parseRol(map['rol']),
       organizacionId: map['organizacionId'],
       activo: map['activo'] ?? true,
-      fechaCreacion: map['fechaCreacion'] != null
-          ? DateTime.parse(map['fechaCreacion'])
-          : DateTime.now(),
-      ultimoAcceso: map['ultimoAcceso'] != null
-          ? DateTime.parse(map['ultimoAcceso'])
-          : null,
+      fechaCreacion: _parseDateTime(map['fechaCreacion']),
+      ultimoAcceso: _parseDateTimeNullable(map['ultimoAcceso']),
     );
   }
 
@@ -84,6 +82,20 @@ class UserModel {
   bool get puedeGestionarPagos => esAdmin;
   bool get puedeEliminar => esAdmin;
   bool get puedeCrearRifas => esAdmin;
+
+  static DateTime _parseDateTime(dynamic value) {
+    if (value == null) return DateTime.now();
+    if (value is DateTime) return value;
+    if (value is Timestamp) return value.toDate();
+    return DateTime.parse(value.toString());
+  }
+
+  static DateTime? _parseDateTimeNullable(dynamic value) {
+    if (value == null) return null;
+    if (value is DateTime) return value;
+    if (value is Timestamp) return value.toDate();
+    return DateTime.parse(value.toString());
+  }
 
   static UserRol _parseRol(String? rol) {
     switch (rol) {

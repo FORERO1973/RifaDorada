@@ -410,7 +410,7 @@ class _ConfiguracionScreenState extends State<ConfiguracionScreen> {
             controller: _chatbotUrlController,
             style: GoogleFonts.outfit(fontWeight: FontWeight.w600, fontSize: 14),
             decoration: InputDecoration(
-              hintText: 'http://192.168.1.100:3008',
+              hintText: 'http://192.168.200.107:3008',
               prefixIcon: const Icon(Icons.link_rounded, size: 20),
               contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
               border: OutlineInputBorder(

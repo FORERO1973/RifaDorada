@@ -12,6 +12,7 @@ import 'screens/configuracion_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/vendedor_home_screen.dart';
 import 'screens/vendedor_ventas_screen.dart';
+import 'screens/super_admin_screen.dart';
 
 class RifaDoradaApp extends StatelessWidget {
   const RifaDoradaApp({super.key});
@@ -59,6 +60,10 @@ class AuthGateway extends StatelessWidget {
           );
           rifaProvider.loadRifas();
         });
+
+        if (auth.esSuperAdmin) {
+          return const SuperAdminNavigationScreen();
+        }
 
         if (auth.esAdmin) {
           return const MainNavigationScreen();
@@ -126,6 +131,26 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
     );
   }
 
+  void _showLogoutDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Cerrar Sesión'),
+        content: const Text('¿Estás seguro de cerrar sesión?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              context.read<AuthProvider>().logout();
+            },
+            child: const Text('Cerrar Sesión'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -165,15 +190,28 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceAround,
-          children: List.generate(_navItems.length, (index) {
-            final item = _navItems[index];
-            final isActive = _currentIndex == index;
-            return _AnimatedNavItem(
-              item: item,
-              isActive: isActive,
-              onTap: () => _onNavTap(index),
-            );
-          }),
+          children: [
+            ...List.generate(_navItems.length, (index) {
+              final item = _navItems[index];
+              final isActive = _currentIndex == index;
+              return _AnimatedNavItem(
+                item: item,
+                isActive: isActive,
+                onTap: () => _onNavTap(index),
+              );
+            }),
+            GestureDetector(
+              onTap: () => _showLogoutDialog(context),
+              child: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: AppTheme.errorColor.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(Icons.logout, size: 20, color: AppTheme.errorColor),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -228,6 +266,26 @@ class _VendedorNavigationScreenState extends State<VendedorNavigationScreen>
     );
   }
 
+  void _showLogoutDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Cerrar Sesión'),
+        content: const Text('¿Estás seguro de cerrar sesión?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              context.read<AuthProvider>().logout();
+            },
+            child: const Text('Cerrar Sesión'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -251,15 +309,28 @@ class _VendedorNavigationScreenState extends State<VendedorNavigationScreen>
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: List.generate(_navItems.length, (index) {
-              final item = _navItems[index];
-              final isActive = _currentIndex == index;
-              return _AnimatedNavItem(
-                item: item,
-                isActive: isActive,
-                onTap: () => _onNavTap(index),
-              );
-            }),
+            children: [
+              ...List.generate(_navItems.length, (index) {
+                final item = _navItems[index];
+                final isActive = _currentIndex == index;
+                return _AnimatedNavItem(
+                  item: item,
+                  isActive: isActive,
+                  onTap: () => _onNavTap(index),
+                );
+              }),
+              GestureDetector(
+                onTap: () => _showLogoutDialog(context),
+                child: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: AppTheme.errorColor.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(Icons.logout, size: 20, color: AppTheme.errorColor),
+                ),
+              ),
+            ],
           ),
         ),
       ),

@@ -113,7 +113,20 @@ class _AdminScreenState extends State<AdminScreen> {
   }
 
   Widget _buildAdminRifaCard(BuildContext context, Rifa rifa, RifaProvider provider) {
-    final stats = provider.getEstadisticasForRifa(rifa.id, rifa.precioNumero);
+    return FutureBuilder<Map<String, dynamic>>(
+      future: provider.getEstadisticasForRifa(rifa.id, rifa.precioNumero),
+      builder: (context, snapshot) {
+        final stats = snapshot.data ?? {
+          'totalVendidos': 0, 'totalDisponibles': 0,
+          'totalVendido': 0.0, 'pendientePago': 0.0,
+          'numerosPagados': 0, 'numerosReservados': 0,
+        };
+        return _buildAdminRifaCardContent(context, rifa, provider, stats);
+      },
+    );
+  }
+
+  Widget _buildAdminRifaCardContent(BuildContext context, Rifa rifa, RifaProvider provider, Map<String, dynamic> stats) {
     return _HoverCard(
       child: ExpansionTile(
         tilePadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),

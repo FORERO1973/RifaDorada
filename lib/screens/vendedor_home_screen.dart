@@ -6,6 +6,7 @@ import '../config/constants.dart';
 import '../providers/auth_provider.dart';
 import '../providers/rifa_provider.dart';
 import '../models/participante.dart';
+import '../services/firebase_service.dart';
 import 'selector_numeros_screen.dart';
 
 class VendedorHomeScreen extends StatefulWidget {
@@ -19,8 +20,22 @@ class _VendedorHomeScreenState extends State<VendedorHomeScreen> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<RifaProvider>().loadRifas();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final provider = context.read<RifaProvider>();
+      final auth = context.read<AuthProvider>();
+      await provider.loadRifas();
+      if (provider.rifas.isNotEmpty) {
+        final vendedorId = auth.currentUser?.uid;
+        List<Participante> all = [];
+        for (final r in provider.rifas) {
+          try {
+            final pList = await FirebaseService.instance
+                .getParticipantesOnce(r.id, vendedorId: vendedorId);
+            all.addAll(pList);
+          } catch (_) {}
+        }
+        provider.setParticipantes(all);
+      }
     });
   }
 

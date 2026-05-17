@@ -10,7 +10,7 @@ class AppConstants {
   static const String countryCode = '+57';
   static const String timezone = 'America/Bogota';
 
-  static const String _defaultChatbotUrl = 'http://192.168.200.106:3008';
+  static const String _defaultChatbotUrl = 'http://192.168.200.107:3008';
   static const String _chatbotUrlKey = 'chatbot_url';
 
   static String _chatbotUrl = _defaultChatbotUrl;
@@ -41,6 +41,7 @@ class AppConstants {
   static const int maxNumeros1000 = 1000;
   
   static const List<String> ciudadesColombia = [
+    'Puerto Santander',
     'Bogotá',
     'Medellín',
     'Cali',
@@ -64,6 +65,25 @@ class AppConstants {
     'Riohacha',
     'Quibdó',
     'San Andrés',
+    'La Fría',
+    'Orope',
+    'Coloncito',
+    'El Guayabo',
+    'El Vigía',
+    'Boca de Grita',
+    'Matecaña',
+    'La Floresta',
+    'Puerto Lleras',
+    'Agua Clara',
+    'La Jarra',
+    'La Jabilla',
+    'Guaramito',
+    'Puerto Villamizar',
+    'Puerto León',
+    'Banco Arenas',
+    'La Punta',
+    'Palmarito',
+    'Vigilancia',
     'Otra',
   ];
 

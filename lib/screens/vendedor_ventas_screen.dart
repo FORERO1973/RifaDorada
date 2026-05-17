@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../config/theme.dart';
@@ -8,6 +9,7 @@ import '../providers/rifa_provider.dart';
 import '../models/participante.dart';
 import '../models/rifa.dart';
 import '../services/firebase_service.dart';
+import '../services/report_service.dart';
 import 'ticket_screen.dart';
 
 class VendedorVentasScreen extends StatefulWidget {
@@ -25,13 +27,32 @@ class _VendedorVentasScreenState extends State<VendedorVentasScreen> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
       final provider = context.read<RifaProvider>();
-      provider.loadRifas();
-      if (provider.rifaSeleccionada != null) {
-        provider.loadParticipantes(provider.rifaSeleccionada!.id);
+      await provider.loadRifas();
+      if (provider.rifas.isNotEmpty) {
+        await _loadParticipantsForFilter(provider);
       }
     });
+  }
+
+  Future<void> _loadParticipantsForFilter(RifaProvider provider) async {
+    final auth = context.read<AuthProvider>();
+    final vendedorId = auth.currentUser?.uid;
+
+    if (_filterRifaId == 'todas') {
+      List<Participante> all = [];
+      for (final r in provider.rifas) {
+        try {
+          final pList = await FirebaseService.instance
+              .getParticipantesOnce(r.id, vendedorId: vendedorId);
+          all.addAll(pList);
+        } catch (_) {}
+      }
+      provider.setParticipantes(all);
+    } else {
+      await provider.loadParticipantes(_filterRifaId);
+    }
   }
 
   @override
@@ -48,6 +69,13 @@ class _VendedorVentasScreenState extends State<VendedorVentasScreen> {
       appBar: AppBar(
         title: const Text('Mis Clientes', style: TextStyle(fontWeight: FontWeight.bold)),
         elevation: 0,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.file_download_outlined),
+            tooltip: 'Exportar',
+            onPressed: () => _showExportDialog(context),
+          ),
+        ],
       ),
       body: Column(
         children: [
@@ -85,6 +113,91 @@ class _VendedorVentasScreenState extends State<VendedorVentasScreen> {
                 );
               },
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showExportDialog(BuildContext ctx) {
+    final provider = ctx.read<RifaProvider>();
+    final authProvider = ctx.read<AuthProvider>();
+    final user = authProvider.currentUser;
+    if (user == null) return;
+
+    final rid = _filterRifaId != 'todas' ? _filterRifaId : null;
+    final rName = _filterRifaId != 'todas'
+        ? provider.rifas.where((r) => r.id == _filterRifaId).firstOrNull?.nombre
+        : null;
+
+    showDialog(
+      context: ctx,
+      builder: (dialogCtx) => AlertDialog(
+        title: const Text('Exportar Clientes'),
+        content: const Text('Selecciona el formato:'),
+        actions: [
+          TextButton.icon(
+            onPressed: () {
+              Navigator.pop(dialogCtx);
+              provider.exportarDatosCSV(
+                rifaId: rid,
+                nombreRifa: rName,
+                vendedorId: user.uid,
+                vendedorNombre: user.nombre,
+              );
+            },
+            icon: const Icon(Icons.table_chart_outlined, size: 18),
+            label: const Text('CSV (Excel)'),
+          ),
+          ElevatedButton.icon(
+            onPressed: () async {
+              Navigator.pop(dialogCtx);
+              if (rid == null) {
+                if (ctx.mounted) {
+                  ScaffoldMessenger.of(ctx).showSnackBar(
+                    const SnackBar(content: Text('Selecciona una rifa específica para exportar PDF')),
+                  );
+                }
+                return;
+              }
+              try {
+                final config = await FirebaseService.instance
+                    .getAppConfig(organizacionId: authProvider.organizacionId);
+                final participantes = await FirebaseService.instance
+                    .getParticipantesOnce(rid, vendedorId: user.uid);
+                if (participantes.isEmpty) {
+                  if (ctx.mounted) {
+                    ScaffoldMessenger.of(ctx).showSnackBar(
+                      const SnackBar(content: Text('No hay clientes para exportar')),
+                    );
+                  }
+                  return;
+                }
+                final numerosMap = await FirebaseService.instance.getNumeros(rid);
+                final numerosEstado = numerosMap.map((k, v) => MapEntry(k, v.estado.name));
+                final rifa = provider.rifas.firstWhere((r) => r.id == rid);
+                await ReportService.instance.generatePdfReport(
+                  rifa: rifa,
+                  participantes: participantes,
+                  organizacion: config?.organizacion,
+                  numerosEstado: numerosEstado,
+                );
+                if (ctx.mounted) {
+                  ScaffoldMessenger.of(ctx).showSnackBar(
+                    const SnackBar(content: Text('✅ PDF exportado')),
+                  );
+                }
+              } catch (e) {
+                if (ctx.mounted) {
+                  ScaffoldMessenger.of(ctx).showSnackBar(
+                    SnackBar(content: Text('⚠️ Error: $e'), backgroundColor: Colors.orange),
+                  );
+                }
+              }
+            },
+            icon: const Icon(Icons.picture_as_pdf, size: 18),
+            label: const Text('PDF'),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red.shade700),
           ),
         ],
       ),
@@ -133,9 +246,7 @@ class _VendedorVentasScreenState extends State<VendedorVentasScreen> {
             ],
             onChanged: (val) {
               setState(() => _filterRifaId = val ?? 'todas');
-              if (val != null && val != 'todas') {
-                provider.loadParticipantes(val);
-              }
+              _loadParticipantsForFilter(provider);
             },
           ),
         ],
@@ -220,18 +331,22 @@ class _VendedorVentasScreenState extends State<VendedorVentasScreen> {
                 child: Text(n, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: estadoColor)),
               )).toList(),
             ),
+            const SizedBox(height: 10),
+            _buildAbonosSection(p, rifa),
             const Divider(height: 20),
             Row(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
                 _buildAction(
                   icon: Icons.message_outlined,
+                  label: 'WhatsApp',
                   color: Colors.green,
                   onTap: () => _contactWhatsApp(p, rifa),
                 ),
                 const SizedBox(width: 8),
                 _buildAction(
                   icon: Icons.confirmation_number_outlined,
+                  label: 'Ticket',
                   color: AppTheme.primaryColor,
                   onTap: () {
                     if (rifa != null) {
@@ -245,6 +360,7 @@ class _VendedorVentasScreenState extends State<VendedorVentasScreen> {
                   const SizedBox(width: 8),
                   _buildAction(
                     icon: Icons.add_circle_outline,
+                    label: 'Abonar',
                     color: Colors.orange,
                     onTap: () => _showAbonoDialog(p, provider, rifa),
                   ),
@@ -273,17 +389,24 @@ class _VendedorVentasScreenState extends State<VendedorVentasScreen> {
     );
   }
 
-  Widget _buildAction({required IconData icon, required Color color, required VoidCallback onTap}) {
+  Widget _buildAction({required IconData icon, required String label, required Color color, required VoidCallback onTap}) {
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(10),
       child: Container(
-        padding: const EdgeInsets.all(10),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
         decoration: BoxDecoration(
           border: Border.all(color: color.withValues(alpha: 0.3)),
           borderRadius: BorderRadius.circular(10),
         ),
-        child: Icon(icon, color: color, size: 20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, color: color, size: 20),
+            const SizedBox(height: 2),
+            Text(label, style: TextStyle(fontSize: 8, fontWeight: FontWeight.w600, color: color)),
+          ],
+        ),
       ),
     );
   }
@@ -458,6 +581,7 @@ class _VendedorVentasScreenState extends State<VendedorVentasScreen> {
                     );
                     return;
                   }
+                  final navigator = Navigator.of(context, rootNavigator: true);
                   final (error, estado) = await provider.registrarAbono(
                     participanteId: p.id,
                     monto: montoVal,
@@ -466,35 +590,117 @@ class _VendedorVentasScreenState extends State<VendedorVentasScreen> {
                     rifaId: rifa?.id,
                     precioNumero: precioNumero,
                   );
-                  if (context.mounted) {
-                    if (error != null) {
+                  if (error != null) {
+                    if (context.mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(content: Text('⚠️ $error'), backgroundColor: Colors.orange),
                       );
-                    } else {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: const Text('✅ Abono registrado. Enviando ticket...'),
-                          backgroundColor: AppTheme.secondaryColor,
-                          duration: const Duration(seconds: 1),
-                        ),
-                      );
                     }
+                    return;
                   }
-                  Navigator.pop(context);
-                  if (error == null && context.mounted) {
-                    final idx = provider.participantes.indexWhere((x) => x.id == p.id);
-                    final updated = idx >= 0 ? provider.participantes[idx] : p;
-                    Navigator.push(context, MaterialPageRoute(
-                      builder: (_) => TicketScreen(participante: updated, rifa: rifa!, autoSend: true),
-                    ));
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: const Text('✅ Abono registrado. Enviando ticket...'),
+                        backgroundColor: AppTheme.secondaryColor,
+                        duration: const Duration(seconds: 1),
+                      ),
+                    );
                   }
+                  navigator.pop();
+                  final idx = provider.participantes.indexWhere((x) => x.id == p.id);
+                  final updated = idx >= 0 ? provider.participantes[idx] : p;
+                  navigator.push(MaterialPageRoute(
+                    builder: (_) => TicketScreen(participante: updated, rifa: rifa!, autoSend: true),
+                  ));
                 },
                 child: const Text('REGISTRAR ABONO'),
               ),
             ],
           );
         },
+      ),
+    );
+  }
+
+  Widget _buildAbonosSection(Participante p, Rifa? rifa) {
+    final precioNumero = rifa?.precioNumero ?? 0;
+    final precioTotal = p.numeros.length * precioNumero;
+    final saldo = precioTotal - p.totalPagado;
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppTheme.surfaceColor,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppTheme.dividerColor),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('Abonos',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppTheme.textSecondary)),
+              Text('Total: ${AppConstants.formatCurrencyCOP(p.totalPagado)}',
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.purple)),
+            ],
+          ),
+          if (p.abonos.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            ...p.abonos.map((a) => Padding(
+              padding: const EdgeInsets.only(bottom: 6),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: [
+                      Icon(Icons.payment, size: 14, color: Colors.purple),
+                      const SizedBox(width: 6),
+                      Text(DateFormat('dd/MM').format(a.fecha),
+                          style: TextStyle(fontSize: 12, color: AppTheme.textSecondary)),
+                      const SizedBox(width: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: Colors.purple.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(a.metodoPago,
+                            style: TextStyle(fontSize: 9, color: Colors.purple, fontWeight: FontWeight.bold)),
+                      ),
+                      if (a.nota != null && a.nota!.isNotEmpty) ...[
+                        const SizedBox(width: 4),
+                        Icon(Icons.notes, size: 12, color: AppTheme.textSecondary),
+                      ],
+                    ],
+                  ),
+                  Text(AppConstants.formatCurrencyCOP(a.monto),
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                ],
+              ),
+            )),
+          ] else ...[
+            const SizedBox(height: 8),
+            Text('Sin abonos registrados', style: TextStyle(fontSize: 11, color: AppTheme.textSecondary)),
+          ],
+          const Divider(height: 12),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('Saldo pendiente', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+              Text(
+                AppConstants.formatCurrencyCOP(saldo),
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 13,
+                  color: saldo > 0 ? AppTheme.errorColor : AppTheme.secondaryColor,
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
