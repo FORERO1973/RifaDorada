@@ -552,6 +552,7 @@ class _HomeScreenState extends State<HomeScreen>
                 const SizedBox(height: 8),
                 DropdownButtonFormField<String>(
                   initialValue: selectedLoteria,
+                  isExpanded: true,
                   style: TextStyle(fontSize: 13, color: AppTheme.textPrimary),
                   decoration: const InputDecoration(
                     labelText: 'Lotería',
@@ -564,6 +565,7 @@ class _HomeScreenState extends State<HomeScreen>
                 const SizedBox(height: 8),
                 DropdownButtonFormField<String>(
                   initialValue: selectedDia,
+                  isExpanded: true,
                   style: TextStyle(fontSize: 13, color: AppTheme.textPrimary),
                   decoration: const InputDecoration(
                     labelText: 'Día de Sorteo',
@@ -574,8 +576,8 @@ class _HomeScreenState extends State<HomeScreen>
                   onChanged: (val) => setState(() => selectedDia = val),
                 ),
                 const SizedBox(height: 8),
-                InkWell(
-                  onTap: () async {
+                TextButton.icon(
+                  onPressed: () async {
                     final picked = await showDatePicker(
                       context: context,
                       initialDate: selectedFecha ?? DateTime.now(),
@@ -584,16 +586,18 @@ class _HomeScreenState extends State<HomeScreen>
                     );
                     if (picked != null) setState(() => selectedFecha = picked);
                   },
-                  child: InputDecorator(
-                    decoration: const InputDecoration(
-                      labelText: 'Fecha de Sorteo',
-                      isDense: true,
-                      contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                      suffixIcon: Icon(Icons.calendar_today, size: 18),
-                    ),
-                    child: Text(
-                      selectedFecha != null ? DateFormat('dd/MM/yyyy').format(selectedFecha!) : 'No seleccionada',
-                      style: const TextStyle(fontSize: 13),
+                  icon: const Icon(Icons.calendar_today, size: 16),
+                  label: Text(
+                    selectedFecha != null ? 'Sorteo: ${DateFormat('dd/MM/yyyy').format(selectedFecha!)}' : 'Seleccionar fecha',
+                    style: const TextStyle(fontSize: 12),
+                  ),
+                  style: TextButton.styleFrom(
+                    backgroundColor: AppTheme.surfaceColor,
+                    foregroundColor: AppTheme.textPrimary,
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                    shape: RoundedRectangleBorder(
+                      side: BorderSide(color: AppTheme.dividerColor),
+                      borderRadius: BorderRadius.circular(4),
                     ),
                   ),
                 ),
@@ -657,11 +661,11 @@ class _HomeScreenState extends State<HomeScreen>
                         borderRadius: BorderRadius.circular(8),
                         border: Border.all(color: AppTheme.dividerColor, style: BorderStyle.solid),
                       ),
-                      child: const Row(
+                      child: Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           Icon(Icons.add_photo_alternate_outlined, color: AppTheme.textSecondary, size: 18),
-                          SizedBox(width: 6),
+                          const SizedBox(width: 6),
                           Text('Agregar imágenes', style: TextStyle(fontSize: 12, color: AppTheme.textSecondary)),
                         ],
                       ),
