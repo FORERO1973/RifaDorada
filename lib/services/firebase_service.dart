@@ -527,7 +527,7 @@ class FirebaseService {
       // Fetch user names
       for (final vid in vendedores.keys.toList()) {
         try {
-          final userDoc = await _firestore!.collection('usuarios').doc(vid).get();
+          final userDoc = await _firestore!.collection('users').doc(vid).get();
           if (userDoc.exists) {
             vendedores[vid]!['nombre'] = userDoc.data()!['nombre'] ?? vid;
           }
