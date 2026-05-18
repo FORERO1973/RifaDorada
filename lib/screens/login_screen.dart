@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_auth/firebase_auth.dart' show FirebaseAuth, FirebaseAuthException;
 import '../config/theme.dart';
 import '../providers/auth_provider.dart';
 import 'register_screen.dart';
