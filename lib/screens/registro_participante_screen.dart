@@ -364,9 +364,9 @@ class _RegistroParticipanteScreenState
           ),
         );
 
+        final nav = Navigator.of(context);
         Navigator.pop(context);
-        final ticketOk = await Navigator.push<bool>(
-          context,
+        final ticketOk = await nav.push<bool>(
           MaterialPageRoute(
             builder: (_) => TicketScreen(
               participante: participante,
@@ -377,9 +377,8 @@ class _RegistroParticipanteScreenState
           ),
         );
 
-        if (ticketOk == true && mounted) {
-          Navigator.push(
-            context,
+        if (ticketOk == true) {
+          nav.push(
             MaterialPageRoute(
               builder: (_) => const ImagenEstadoScreen(
                 autoUpload: true,
