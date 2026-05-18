@@ -331,7 +331,7 @@ class _StatsScreenState extends State<StatsScreen> {
         ),
         GridView.count(
           crossAxisCount: 2, shrinkWrap: true, physics: const NeverScrollableScrollPhysics(),
-          crossAxisSpacing: 12, mainAxisSpacing: 12, childAspectRatio: 1.6,
+          crossAxisSpacing: 10, mainAxisSpacing: 10, childAspectRatio: 1.3,
           children: [
             _buildStatCard('Recaudado', formatMoney(totalPagado), Icons.payments_rounded,
               LinearGradient(colors: [Colors.green.shade600, Colors.green.shade800])),
@@ -361,30 +361,30 @@ class _StatsScreenState extends State<StatsScreen> {
 
   Widget _buildStatCard(String title, String value, IconData icon, Gradient gradient) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
         gradient: gradient,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [BoxShadow(color: (gradient.colors.last).withValues(alpha: 0.3), blurRadius: 10, offset: const Offset(0, 4))],
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [BoxShadow(color: (gradient.colors.last).withValues(alpha: 0.3), blurRadius: 8, offset: const Offset(0, 3))],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.2), borderRadius: BorderRadius.circular(12)),
-            child: Icon(icon, color: Colors.white, size: 22),
+            padding: const EdgeInsets.all(6),
+            decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.2), borderRadius: BorderRadius.circular(10)),
+            child: Icon(icon, color: Colors.white, size: 20),
           ),
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(value, style: GoogleFonts.outfit(
-                color: Colors.white, fontWeight: FontWeight.w900, fontSize: 16, letterSpacing: -0.5,
-              ), maxLines: 1, overflow: TextOverflow.ellipsis),
-              const SizedBox(height: 2),
+              FittedBox(fit: BoxFit.scaleDown, child: Text(value, style: GoogleFonts.outfit(
+                color: Colors.white, fontWeight: FontWeight.w900, fontSize: 14, letterSpacing: -0.5,
+              ), maxLines: 1)),
+              const SizedBox(height: 1),
               Text(title.toUpperCase(), style: GoogleFonts.outfit(
-                color: Colors.white.withValues(alpha: 0.9), fontWeight: FontWeight.w800, fontSize: 9, letterSpacing: 1,
+                color: Colors.white.withValues(alpha: 0.9), fontWeight: FontWeight.w800, fontSize: 8, letterSpacing: 1,
               ), maxLines: 1, overflow: TextOverflow.ellipsis),
             ],
           ),
