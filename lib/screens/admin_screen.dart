@@ -252,9 +252,9 @@ Widget _buildStatsSection(Map<String, dynamic> stats, Rifa rifa) {
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
           crossAxisCount: 3,
-          mainAxisSpacing: 0, // ESPACIO VERTICAL ELIMINADO
-          crossAxisSpacing: 8,
-          childAspectRatio: 1.15, // AÚN MÁS COMPACTO
+          mainAxisSpacing: 4,
+          crossAxisSpacing: 6,
+          childAspectRatio: 1.0,
           children: [
             _buildCircularAction(
               icon: Icons.edit_rounded,

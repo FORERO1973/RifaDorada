@@ -428,19 +428,19 @@ class _RifaDetalleScreenState extends State<_RifaDetalleScreen> {
 
   Widget _buildStatCard({required IconData icon, required String value, required String label, required Color color}) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 10),
       decoration: BoxDecoration(
         color: AppTheme.cardColor,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(icon, color: color, size: 24),
-          const SizedBox(height: 4),
-          Text(value, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-          Text(label, style: TextStyle(color: AppTheme.textSecondary, fontSize: 10)),
+          Icon(icon, color: color, size: 20),
+          const SizedBox(height: 2),
+          FittedBox(fit: BoxFit.scaleDown, child: Text(value, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13))),
+          Text(label, style: TextStyle(color: AppTheme.textSecondary, fontSize: 9)),
         ],
       ),
     );
@@ -562,43 +562,40 @@ class _RifaDetalleScreenState extends State<_RifaDetalleScreen> {
                 ),
                 const SizedBox(height: 10),
                 _buildAbonosSection(p, rifa),
-                const Divider(height: 24),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
+                const Divider(height: 16),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  alignment: WrapAlignment.end,
                   children: [
                     if (provider.isAdmin)
                       _buildIconAction(icon: Icons.delete_outline, color: AppTheme.errorColor, onTap: () => _confirmDelete(p, provider)),
-                    if (provider.isAdmin) const SizedBox(width: 8),
                     _buildIconAction(icon: Icons.message_outlined, color: Colors.green, onTap: () => _contactWhatsApp(p, rifa)),
-                    const SizedBox(width: 8),
                     _buildIconAction(
                       icon: Icons.confirmation_number_outlined,
                       color: AppTheme.primaryColor,
                       onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => TicketScreen(participante: p, rifa: rifa)))
                     ),
-                    const SizedBox(width: 8),
                     if (!isPaid)
                       _buildIconAction(
                         icon: Icons.add_card_rounded,
                         color: Colors.purple,
                         onTap: () => _showAbonoDialog(context, p, provider, rifa),
                       ),
-                    if (!isPaid) const SizedBox(width: 8),
-                    Expanded(
-                      child: !isPaid
-                        ? ElevatedButton.icon(
-                            onPressed: () => _confirmPago(context, p, provider),
-                            icon: const Icon(Icons.check_circle_outline, size: 16),
-                            label: const Text('PAGAR', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
-                            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.secondaryColor, foregroundColor: Colors.white, minimumSize: const Size(0, 38)),
-                          )
-                        : OutlinedButton.icon(
-                            onPressed: () => _confirmAction(context, 'Revertir Pago', '¿Estás seguro de REVERTIR el pago de ${p.nombre}?', () => provider.marcarPago(p.id, false)),
-                            icon: const Icon(Icons.history, size: 16),
-                            label: const Text('REVERTIR', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
-                            style: OutlinedButton.styleFrom(foregroundColor: AppTheme.textSecondary, side: const BorderSide(color: AppTheme.dividerColor), minimumSize: const Size(0, 38)),
-                          ),
-                    ),
+                    if (!isPaid)
+                      ElevatedButton.icon(
+                        onPressed: () => _confirmPago(context, p, provider),
+                        icon: const Icon(Icons.check_circle_outline, size: 16),
+                        label: const Text('PAGAR', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+                        style: ElevatedButton.styleFrom(backgroundColor: AppTheme.secondaryColor, foregroundColor: Colors.white, minimumSize: const Size(80, 36), padding: const EdgeInsets.symmetric(horizontal: 10)),
+                      )
+                    else
+                      OutlinedButton.icon(
+                        onPressed: () => _confirmAction(context, 'Revertir Pago', '¿Estás seguro de REVERTIR el pago de ${p.nombre}?', () => provider.marcarPago(p.id, false)),
+                        icon: const Icon(Icons.history, size: 16),
+                        label: const Text('REVERTIR', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+                        style: OutlinedButton.styleFrom(foregroundColor: AppTheme.textSecondary, side: const BorderSide(color: AppTheme.dividerColor), minimumSize: const Size(80, 36), padding: const EdgeInsets.symmetric(horizontal: 10)),
+                      ),
                   ],
                 ),
               ],

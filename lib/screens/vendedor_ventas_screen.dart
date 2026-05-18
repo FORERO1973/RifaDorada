@@ -334,8 +334,10 @@ class _VendedorVentasScreenState extends State<VendedorVentasScreen> {
             const SizedBox(height: 10),
             _buildAbonosSection(p, rifa),
             const Divider(height: 20),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              alignment: WrapAlignment.end,
               children: [
                 _buildAction(
                   icon: Icons.message_outlined,
@@ -343,7 +345,6 @@ class _VendedorVentasScreenState extends State<VendedorVentasScreen> {
                   color: Colors.green,
                   onTap: () => _contactWhatsApp(p, rifa),
                 ),
-                const SizedBox(width: 8),
                 _buildAction(
                   icon: Icons.confirmation_number_outlined,
                   label: 'Ticket',
@@ -357,17 +358,15 @@ class _VendedorVentasScreenState extends State<VendedorVentasScreen> {
                   },
                 ),
                 if (!isPaid) ...[
-                  const SizedBox(width: 8),
                   _buildAction(
                     icon: Icons.add_circle_outline,
                     label: 'Abonar',
                     color: Colors.orange,
                     onTap: () => _showAbonoDialog(p, provider, rifa),
                   ),
-                  if (rifa != null) ...[
-                    const SizedBox(width: 8),
+                  if (rifa != null)
                     SizedBox(
-                      height: 40,
+                      height: 36,
                       child: ElevatedButton.icon(
                         onPressed: () => _confirmPago(p, provider, rifa),
                         icon: const Icon(Icons.check_circle_outline, size: 16),
@@ -379,7 +378,6 @@ class _VendedorVentasScreenState extends State<VendedorVentasScreen> {
                         ),
                       ),
                     ),
-                  ],
                 ],
               ],
             ),

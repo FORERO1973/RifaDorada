@@ -187,10 +187,12 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
         ],
       ),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceAround,
-          children: [
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 10),
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
             ...List.generate(_navItems.length, (index) {
               final item = _navItems[index];
               final isActive = _currentIndex == index;
@@ -212,6 +214,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
               ),
             ),
           ],
+        ),
         ),
       ),
     );
@@ -306,8 +309,10 @@ class _VendedorNavigationScreenState extends State<VendedorNavigationScreen>
           ],
         ),
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
-          child: Row(
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 10),
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
               ...List.generate(_navItems.length, (index) {
@@ -330,9 +335,10 @@ class _VendedorNavigationScreenState extends State<VendedorNavigationScreen>
                   child: const Icon(Icons.logout, size: 20, color: AppTheme.errorColor),
                 ),
               ),
-            ],
-          ),
+          ],
         ),
+        ),
+      ),
       ),
     );
   }
