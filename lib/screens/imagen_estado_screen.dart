@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import 'package:screenshot/screenshot.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:http/http.dart' as http;
 import '../config/theme.dart';
 import '../config/constants.dart';
 import '../providers/rifa_provider.dart';
@@ -22,6 +23,59 @@ class ImagenEstadoScreen extends StatefulWidget {
 class _ImagenEstadoScreenState extends State<ImagenEstadoScreen> {
   final ScreenshotController _screenshotController = ScreenshotController();
   bool _isSharing = false;
+  bool _isUploading = false;
+
+  Future<void> _uploadToBot(Rifa rifa) async {
+    if (kIsWeb) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Subir al Bot solo está disponible en dispositivos móviles')),
+        );
+      }
+      return;
+    }
+
+    setState(() => _isUploading = true);
+    try {
+      final image = await _screenshotController.capture();
+      if (image == null) throw Exception('No se pudo capturar la imagen');
+
+      final base64 = base64Encode(image);
+      final url = Uri.parse('${AppConstants.chatbotApi}/status-image');
+      final response = await http.post(
+        url,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'rifaId': rifa.id,
+          'imageBase64': base64,
+        }),
+      );
+
+      if (mounted) {
+        if (response.statusCode == 200) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Imagen subida al Bot exitosamente'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        } else {
+          final msg = jsonDecode(response.body)['message'] ?? 'Error desconocido';
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error: $msg'), backgroundColor: Colors.red),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error al subir: $e'), backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isUploading = false);
+    }
+  }
 
   Future<void> _shareImage(Rifa rifa) async {
     if (rifa.tipoRifa != '2 cifras') {
@@ -89,7 +143,14 @@ class _ImagenEstadoScreenState extends State<ImagenEstadoScreen> {
       appBar: AppBar(
         title: const Text('Estado de Números'),
         actions: [
-          if (rifa.tipoRifa == '2 cifras')
+          if (rifa.tipoRifa == '2 cifras') ...[
+            IconButton(
+              icon: _isUploading
+                ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                : const Icon(Icons.cloud_upload_rounded),
+              onPressed: _isUploading ? null : () => _uploadToBot(rifa),
+              tooltip: 'Subir al Bot',
+            ),
             IconButton(
               icon: _isSharing 
                 ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
@@ -97,6 +158,7 @@ class _ImagenEstadoScreenState extends State<ImagenEstadoScreen> {
               onPressed: _isSharing ? null : () => _shareImage(rifa),
               tooltip: 'Compartir Imagen',
             ),
+          ],
         ],
       ),
       body: SingleChildScrollView(
