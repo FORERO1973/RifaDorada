@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../config/theme.dart';
 import '../providers/auth_provider.dart';
 import 'register_screen.dart';
@@ -95,6 +96,14 @@ class _LoginScreenState extends State<LoginScreen> {
                     builder: (context, auth, _) {
                       return _buildLoginButton(auth.isLoading);
                     },
+                  ),
+                  const SizedBox(height: 8),
+                  TextButton(
+                    onPressed: _showPasswordResetDialog,
+                    child: Text(
+                      '¿Olvidaste tu contraseña?',
+                      style: TextStyle(color: AppTheme.primaryColor, fontSize: 13),
+                    ),
                   ),
                   if (_showRegisterOption) ...[
                     const SizedBox(height: 24),
@@ -266,6 +275,71 @@ class _LoginScreenState extends State<LoginScreen> {
           label: const Text('CREAR CUENTA', style: TextStyle(fontWeight: FontWeight.bold)),
         ),
       ],
+    );
+  }
+
+  void _showPasswordResetDialog() {
+    final emailCtrl = TextEditingController(text: _emailController.text.trim());
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Restablecer contraseña'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Text(
+              'Ingresa tu correo y te enviaremos un enlace para restablecer tu contraseña.',
+              style: TextStyle(fontSize: 13),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: emailCtrl,
+              decoration: InputDecoration(
+                labelText: 'Correo electrónico',
+                prefixIcon: const Icon(Icons.email_outlined),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              keyboardType: TextInputType.emailAddress,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancelar'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              final email = emailCtrl.text.trim();
+              if (email.isEmpty) return;
+              try {
+                await FirebaseAuth.instance.sendPasswordResetEmail(email: email);
+                if (ctx.mounted) Navigator.pop(ctx);
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('📧 Revisa tu correo para restablecer la contraseña'),
+                      backgroundColor: Colors.green,
+                    ),
+                  );
+                }
+              } on FirebaseAuthException catch (e) {
+                if (ctx.mounted) Navigator.pop(ctx);
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('⚠️ ${e.message ?? 'Error al enviar el correo'}'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              }
+            },
+            child: const Text('Enviar'),
+          ),
+        ],
+      ),
     );
   }
 
