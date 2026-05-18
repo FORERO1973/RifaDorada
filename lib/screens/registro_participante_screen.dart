@@ -10,6 +10,7 @@ import '../providers/rifa_provider.dart';
 import '../models/rifa.dart';
 import '../models/participante.dart';
 import 'ticket_screen.dart';
+import 'imagen_estado_screen.dart';
 
 class RegistroParticipanteScreen extends StatefulWidget {
   const RegistroParticipanteScreen({super.key});
@@ -364,16 +365,29 @@ class _RegistroParticipanteScreenState
         );
 
         Navigator.pop(context);
-        Navigator.push(
+        final ticketOk = await Navigator.push<bool>(
           context,
           MaterialPageRoute(
             builder: (_) => TicketScreen(
               participante: participante,
               rifa: rifa!,
               autoSend: true,
+              autoPopAfterSend: true,
             ),
           ),
         );
+
+        if (ticketOk == true && mounted) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => const ImagenEstadoScreen(
+                autoUpload: true,
+                autoPopAfterMs: 1500,
+              ),
+            ),
+          );
+        }
       }
     } catch (e) {
       if (mounted) {

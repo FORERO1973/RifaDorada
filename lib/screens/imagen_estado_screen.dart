@@ -14,7 +14,14 @@ import '../models/rifa.dart';
 import '../utils/web_helper.dart';
 
 class ImagenEstadoScreen extends StatefulWidget {
-  const ImagenEstadoScreen({super.key});
+  final bool autoUpload;
+  final int autoPopAfterMs;
+
+  const ImagenEstadoScreen({
+    super.key,
+    this.autoUpload = false,
+    this.autoPopAfterMs = 0,
+  });
 
   @override
   State<ImagenEstadoScreen> createState() => _ImagenEstadoScreenState();
@@ -24,6 +31,18 @@ class _ImagenEstadoScreenState extends State<ImagenEstadoScreen> {
   final ScreenshotController _screenshotController = ScreenshotController();
   bool _isSharing = false;
   bool _isUploading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.autoUpload) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        final provider = context.read<RifaProvider>();
+        final rifa = provider.rifaSeleccionada;
+        if (rifa != null) _uploadToBot(rifa);
+      });
+    }
+  }
 
   Future<void> _uploadToBot(Rifa rifa) async {
     if (kIsWeb) {
@@ -55,10 +74,14 @@ class _ImagenEstadoScreenState extends State<ImagenEstadoScreen> {
         if (response.statusCode == 200) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Imagen subida al Bot exitosamente'),
+              content: Text('✅ Estado de números actualizado en el Bot'),
               backgroundColor: Colors.green,
             ),
           );
+          if (widget.autoPopAfterMs > 0) {
+            await Future.delayed(Duration(milliseconds: widget.autoPopAfterMs));
+            if (mounted) Navigator.pop(context);
+          }
         } else {
           final msg = jsonDecode(response.body)['message'] ?? 'Error desconocido';
           ScaffoldMessenger.of(context).showSnackBar(

@@ -17,12 +17,14 @@ class TicketScreen extends StatefulWidget {
   final Participante participante;
   final Rifa rifa;
   final bool autoSend;
+  final bool autoPopAfterSend;
 
   const TicketScreen({
     super.key,
     required this.participante,
     required this.rifa,
     this.autoSend = false,
+    this.autoPopAfterSend = false,
   });
 
   @override
@@ -105,6 +107,10 @@ class _TicketScreenState extends State<TicketScreen> {
               backgroundColor: AppTheme.secondaryColor,
             ),
           );
+          if (widget.autoPopAfterSend) {
+            await Future.delayed(const Duration(seconds: 2));
+            if (mounted) Navigator.pop(context, true);
+          }
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
