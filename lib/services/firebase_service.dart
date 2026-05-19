@@ -255,6 +255,28 @@ class FirebaseService {
     return results;
   }
 
+  Future<List<Participante>> getAllParticipantes(List<String> rifaIds) async {
+    if (_useLocalData || rifaIds.isEmpty) return [];
+    try {
+      final List<Participante> all = [];
+      for (final id in rifaIds) {
+        try {
+          final snapshot = await _firestore!
+              .collection('participantes')
+              .where('rifaId', isEqualTo: id)
+              .get();
+          all.addAll(snapshot.docs
+              .map((doc) => Participante.fromMap(doc.data(), doc.id)));
+        } catch (_) {}
+      }
+      all.sort((a, b) => b.fechaRegistro.compareTo(a.fechaRegistro));
+      return all;
+    } catch (e) {
+      debugPrint('[FIREBASE] Error getting all participantes: $e');
+      return [];
+    }
+  }
+
   Future<String> registrarParticipante(Participante participante) async {
     final id = _generateId();
     
@@ -440,7 +462,9 @@ class FirebaseService {
         final numerosSnapshot = await _firestore!
             .collection('rifas').doc(rifaId).collection('numeros').get();
         for (final doc in numerosSnapshot.docs) {
-          final estado = doc.data()['estado'] as String?;
+          final data = doc.data() as Map<String, dynamic>?;
+          if (data == null) continue;
+          final estado = data['estado'] as String?;
           if (estado == 'pagado') pagados++;
           else if (estado == 'reservado') reservados++;
           else disponibles++;
@@ -456,7 +480,8 @@ class FirebaseService {
       double totalRecaudado = 0;
       double pendientePago = 0;
       for (final doc in participantesSnapshot.docs) {
-        final data = doc.data();
+        final data = doc.data() as Map<String, dynamic>?;
+        if (data == null) continue;
         final estado = data['estadoPago'] as String?;
         final pagado = (data['totalPagado'] as num?)?.toDouble() ?? 0;
         totalRecaudado += pagado;
@@ -495,17 +520,21 @@ class FirebaseService {
     }
   }
 
-  Future<Map<String, dynamic>> getFirebaseVendedorStats({String? organizacionId}) async {
+  Future<Map<String, dynamic>> getFirebaseVendedorStats({String? organizacionId, String? rifaId}) async {
     if (_useLocalData) return {};
     try {
-      final snapshot = await _firestore!
+      Query query = _firestore!
           .collection('participantes')
-          .where('vendedorId', isGreaterThan: '')
-          .get();
+          .where('vendedorId', isGreaterThan: '');
+      if (rifaId != null) {
+        query = query.where('rifaId', isEqualTo: rifaId);
+      }
+      final snapshot = await query.get();
 
       final Map<String, Map<String, dynamic>> vendedores = {};
       for (final doc in snapshot.docs) {
-        final data = doc.data();
+        final data = doc.data() as Map<String, dynamic>?;
+        if (data == null) continue;
         final vid = data['vendedorId'] as String?;
         if (vid == null || vid.isEmpty) continue;
 
@@ -529,7 +558,8 @@ class FirebaseService {
         try {
           final userDoc = await _firestore!.collection('users').doc(vid).get();
           if (userDoc.exists) {
-            vendedores[vid]!['nombre'] = userDoc.data()!['nombre'] ?? vid;
+            final userData = userDoc.data();
+            vendedores[vid]!['nombre'] = userData?['nombre'] ?? vid;
           }
         } catch (_) {}
       }
@@ -551,7 +581,9 @@ class FirebaseService {
 
       final Map<String, int> methods = {};
       for (final doc in snapshot.docs) {
-        final abonos = doc.data()['abonos'];
+        final data = doc.data() as Map<String, dynamic>?;
+        if (data == null) continue;
+        final abonos = data['abonos'];
         if (abonos is List) {
           for (final abono in abonos) {
             final metodo = (abono as Map)['metodoPago'] as String? ?? 'otro';
@@ -562,6 +594,36 @@ class FirebaseService {
       return {'methods': methods};
     } catch (e) {
       debugPrint('[FIREBASE] Error getting payment stats: $e');
+      return {'methods': <String, int>{}};
+    }
+  }
+
+  Future<Map<String, dynamic>> getPaymentMethodStatsGlobal(List<String> rifaIds) async {
+    if (_useLocalData || rifaIds.isEmpty) return {};
+    try {
+      final Map<String, int> methods = {};
+      for (final rifaId in rifaIds) {
+        try {
+          final snapshot = await _firestore!
+              .collection('participantes')
+              .where('rifaId', isEqualTo: rifaId)
+              .get();
+          for (final doc in snapshot.docs) {
+            final data = doc.data() as Map<String, dynamic>?;
+            if (data == null) continue;
+            final abonos = data['abonos'];
+            if (abonos is List) {
+              for (final abono in abonos) {
+                final metodo = (abono as Map)['metodoPago'] as String? ?? 'otro';
+                methods[metodo] = (methods[metodo] ?? 0) + 1;
+              }
+            }
+          }
+        } catch (_) {}
+      }
+      return {'methods': methods};
+    } catch (e) {
+      debugPrint('[FIREBASE] Error getting global payment stats: $e');
       return {'methods': <String, int>{}};
     }
   }

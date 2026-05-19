@@ -548,12 +548,25 @@ Map<String, dynamic> getEstadisticas() {
     return _firebaseService.getFirebaseRifaStats(rifaId, precioNumero);
   }
 
-  Future<Map<String, dynamic>> getVendedorStats() async {
-    return _firebaseService.getFirebaseVendedorStats(organizacionId: _organizacionId);
+  Future<List<Participante>> getAllParticipantes() async {
+    final ids = _rifas.map((r) => r.id).toList();
+    return _firebaseService.getAllParticipantes(ids);
+  }
+
+  Future<Map<String, dynamic>> getVendedorStats({String? rifaId}) async {
+    return _firebaseService.getFirebaseVendedorStats(
+      organizacionId: _organizacionId,
+      rifaId: rifaId,
+    );
   }
 
   Future<Map<String, dynamic>> getPaymentMethodStats(String rifaId) async {
     return _firebaseService.getPaymentMethodStats(rifaId);
+  }
+
+  Future<Map<String, dynamic>> getPaymentMethodStatsGlobal() async {
+    final ids = _rifas.map((r) => r.id).toList();
+    return _firebaseService.getPaymentMethodStatsGlobal(ids);
   }
 
 

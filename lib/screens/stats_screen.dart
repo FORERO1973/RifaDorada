@@ -7,6 +7,7 @@ import '../config/theme.dart';
 import '../providers/rifa_provider.dart';
 import '../providers/auth_provider.dart';
 import '../models/rifa.dart';
+import '../models/participante.dart';
 import '../config/constants.dart';
 
 class StatsScreen extends StatefulWidget {
@@ -24,6 +25,7 @@ class _StatsScreenState extends State<StatsScreen> {
   Map<String, dynamic> _paymentMethodStats = {};
   bool _loadingVendedor = true;
   bool _loadingPayment = true;
+  List<Participante> _globalParticipantes = [];
 
   @override
   void initState() {
@@ -38,16 +40,10 @@ class _StatsScreenState extends State<StatsScreen> {
     final auth = context.read<AuthProvider>();
 
     try {
-      if (provider.rifas.isNotEmpty) {
-        final rifa = provider.rifas.first;
-        selectedRifa = rifa;
-        provider.setRifaSeleccionada(rifa);
-        await provider.loadParticipantes(rifa.id);
-        await provider.loadNumeros(rifa.id);
-      }
+      selectedRifa = null;
+      provider.clearRifaSeleccionada();
 
-      final global = await _getGlobalStats(provider);
-      if (mounted) setState(() { _globalStats = global; });
+      await _refreshGlobalStats(provider);
 
       if (auth.esAdmin) {
         setState(() => _loadingVendedor = true);
@@ -55,18 +51,33 @@ class _StatsScreenState extends State<StatsScreen> {
         if (mounted) setState(() { _vendedorStats = vStats; _loadingVendedor = false; });
       }
 
-      if (selectedRifa != null) {
-        await _loadPaymentStats(provider, selectedRifa!.id);
-      }
+      await _loadGlobalParticipants(provider);
+      await _refreshGlobalPaymentStats(provider);
     } catch (e) {
       debugPrint('[STATS] Error loading data: $e');
     }
+  }
+
+  Future<void> _refreshGlobalStats(RifaProvider provider) async {
+    final global = await _getGlobalStats(provider);
+    if (mounted) setState(() { _globalStats = global; });
+  }
+
+  Future<void> _refreshGlobalPaymentStats(RifaProvider provider) async {
+    setState(() => _loadingPayment = true);
+    final pStats = await provider.getPaymentMethodStatsGlobal();
+    if (mounted) setState(() { _paymentMethodStats = pStats; _loadingPayment = false; });
   }
 
   Future<void> _loadPaymentStats(RifaProvider provider, String rifaId) async {
     setState(() => _loadingPayment = true);
     final pStats = await provider.getPaymentMethodStats(rifaId);
     if (mounted) setState(() { _paymentMethodStats = pStats; _loadingPayment = false; });
+  }
+
+  Future<void> _loadGlobalParticipants(RifaProvider provider) async {
+    final all = await provider.getAllParticipantes();
+    if (mounted) setState(() { _globalParticipantes = all; });
   }
 
   @override
@@ -82,17 +93,14 @@ class _StatsScreenState extends State<StatsScreen> {
         if (selectedRifa != null) {
           final match = provider.rifas.where((r) => r.id == selectedRifa!.id);
           if (match.isEmpty) {
-            selectedRifa = provider.rifas.first;
+            selectedRifa = provider.rifas.firstOrNull;
           } else {
             selectedRifa = match.first;
           }
-        } else {
-          selectedRifa = provider.rifas.first;
         }
 
-        final stats = selectedRifa != null
-            ? provider.getEstadisticas()
-            : _globalStats;
+        final isGlobal = selectedRifa == null;
+        final stats = isGlobal ? _globalStats : provider.getEstadisticas();
 
         final abonados = stats['participantesAbonados'] as int? ?? 0;
 
@@ -181,7 +189,7 @@ class _StatsScreenState extends State<StatsScreen> {
                         ],
                       ),
                     ),
-                    _buildRifaSelector(provider),
+                    _buildRifaSelector(provider, context.read<AuthProvider>()),
                   ],
                 ),
               ),
@@ -229,7 +237,7 @@ class _StatsScreenState extends State<StatsScreen> {
     );
   }
 
-  Widget _buildRifaSelector(RifaProvider provider) {
+  Widget _buildRifaSelector(RifaProvider provider, AuthProvider auth) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12),
       decoration: BoxDecoration(
@@ -259,9 +267,24 @@ class _StatsScreenState extends State<StatsScreen> {
             provider.loadParticipantes(rifa.id);
             provider.loadNumeros(rifa.id);
             _loadPaymentStats(provider, rifa.id);
+            if (auth.esAdmin) {
+              setState(() => _loadingVendedor = true);
+              provider.getVendedorStats(rifaId: rifaId).then((v) {
+                if (mounted) setState(() { _vendedorStats = v; _loadingVendedor = false; });
+              });
+            }
           } else {
             setState(() => selectedRifa = null);
             provider.clearRifaSeleccionada();
+            _refreshGlobalStats(provider);
+            _refreshGlobalPaymentStats(provider);
+            _loadGlobalParticipants(provider);
+            if (auth.esAdmin) {
+              setState(() => _loadingVendedor = true);
+              provider.getVendedorStats().then((v) {
+                if (mounted) setState(() { _vendedorStats = v; _loadingVendedor = false; });
+              });
+            }
           }
         },
       ),
@@ -273,9 +296,14 @@ class _StatsScreenState extends State<StatsScreen> {
     final totalPagado = (stats['totalVendido'] as num?)?.toDouble() ?? 0;
     final pendiente = (stats['pendientePago'] as num?)?.toDouble() ?? 0;
     final numerosVendidos = stats['totalVendidos'] as int? ?? 0;
-    final totalNumeros = selectedRifa?.cantidadNumeros ?? 1;
+    final isGlobal = selectedRifa == null;
+    final totalNumeros = isGlobal
+        ? (_globalStats['totalNumeros'] as int? ?? _globalStats['totalVendidos'] as int? ?? 1)
+        : (selectedRifa?.cantidadNumeros ?? 1);
     final progreso = totalNumeros > 0 ? (numerosVendidos / totalNumeros) : 0.0;
-    final potencialTotal = totalNumeros * (selectedRifa?.precioNumero ?? 0).toDouble();
+    final potencialTotal = isGlobal
+        ? (_globalStats['potencialTotal'] as num?)?.toDouble() ?? 0
+        : totalNumeros * (selectedRifa?.precioNumero ?? 0).toDouble();
     final totalVendido = totalPagado + pendiente;
 
     return Column(
@@ -394,7 +422,10 @@ class _StatsScreenState extends State<StatsScreen> {
   }
 
   Widget _buildSalesChart(Map<String, dynamic> stats) {
-    final totalNumeros = selectedRifa?.cantidadNumeros ?? 1;
+    final isGlobal = selectedRifa == null;
+    final totalNumeros = isGlobal
+        ? (_globalStats['totalNumeros'] as int? ?? 1)
+        : (selectedRifa?.cantidadNumeros ?? 1);
     final vendidos = stats['totalVendidos'] as int? ?? 0;
     final pagadosCount = stats['numerosPagados'] as int? ?? 0;
     final reservadosCount = stats['numerosReservados'] as int? ?? 0;
@@ -578,6 +609,7 @@ class _StatsScreenState extends State<StatsScreen> {
   }
 
   Widget _buildTrendChart(RifaProvider provider) {
+    final isGlobal = selectedRifa == null;
     final now = DateTime.now();
     int days;
     switch (_timePeriod) {
@@ -590,8 +622,10 @@ class _StatsScreenState extends State<StatsScreen> {
     final Map<int, int> salesByDay = {};
     final cutoff = days < 9999 ? now.subtract(Duration(days: days)) : null;
 
-    for (final p in provider.participantes) {
-      if (selectedRifa != null && p.rifaId != selectedRifa!.id) continue;
+    final participantes = isGlobal ? _globalParticipantes : provider.participantes;
+
+    for (final p in participantes) {
+      if (!isGlobal && p.rifaId != selectedRifa!.id) continue;
       if (cutoff != null && p.fechaRegistro.isBefore(cutoff)) continue;
       final key = DateTime(p.fechaRegistro.year, p.fechaRegistro.month, p.fechaRegistro.day).millisecondsSinceEpoch;
       salesByDay[key] = (salesByDay[key] ?? 0) + p.numeros.length;
@@ -653,9 +687,7 @@ class _StatsScreenState extends State<StatsScreen> {
   }
 
   Widget _buildWeeklyChart(RifaProvider provider) {
-    if (selectedRifa == null) {
-      return const SizedBox.shrink();
-    }
+    final isGlobal = selectedRifa == null;
 
     final now = DateTime.now();
     final monday = now.subtract(Duration(days: now.weekday - 1));
@@ -663,8 +695,10 @@ class _StatsScreenState extends State<StatsScreen> {
     final dayNames = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
     final salesByDay = List.filled(7, 0);
 
-    for (final p in provider.participantes) {
-      if (p.rifaId != selectedRifa!.id) continue;
+    final participantes = isGlobal ? _globalParticipantes : provider.participantes;
+
+    for (final p in participantes) {
+      if (!isGlobal && p.rifaId != selectedRifa!.id) continue;
       if (p.fechaRegistro.isBefore(monday) || p.fechaRegistro.isAfter(now)) continue;
       final dayIndex = p.fechaRegistro.weekday - 1;
       salesByDay[dayIndex] += p.numeros.length;
@@ -814,13 +848,17 @@ class _StatsScreenState extends State<StatsScreen> {
     final vendedores = _vendedorStats['vendedores'] as List<dynamic>? ?? [];
     if (vendedores.isEmpty) return const SizedBox.shrink();
 
+    final isGlobal = selectedRifa == null;
+
     return Consumer<AuthProvider>(
       builder: (context, auth, _) {
         if (!auth.esAdmin) return const SizedBox.shrink();
 
         return _buildChartContainer(
           title: 'Rendimiento por Vendedor',
-          subtitle: '${vendedores.length} vendedores activos',
+          subtitle: isGlobal
+              ? '${vendedores.length} vendedores activos'
+              : '${vendedores.length} vendedores en "${selectedRifa!.nombre}"',
           child: Column(
             children: [
               ...vendedores.map((v) {
@@ -874,6 +912,8 @@ class _StatsScreenState extends State<StatsScreen> {
     int totalDisponiblesCount = 0;
     int numerosPagados = 0;
     int numerosReservados = 0;
+    int totalNumeros = 0;
+    double potencialTotal = 0;
 
     for (final rifa in provider.rifas) {
       final stats = await provider.getEstadisticasForRifa(rifa.id, rifa.precioNumero);
@@ -883,6 +923,8 @@ class _StatsScreenState extends State<StatsScreen> {
       totalDisponiblesCount += stats['totalDisponibles'] as int? ?? 0;
       numerosPagados += stats['numerosPagados'] as int? ?? 0;
       numerosReservados += stats['numerosReservados'] as int? ?? 0;
+      totalNumeros += rifa.cantidadNumeros;
+      potencialTotal += rifa.cantidadNumeros * rifa.precioNumero;
     }
 
     return {
@@ -893,6 +935,8 @@ class _StatsScreenState extends State<StatsScreen> {
       'numerosPagados': numerosPagados,
       'numerosReservados': numerosReservados,
       'participantesAbonados': 0,
+      'totalNumeros': totalNumeros,
+      'potencialTotal': potencialTotal,
     };
   }
 }
