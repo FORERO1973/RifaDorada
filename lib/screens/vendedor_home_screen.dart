@@ -81,6 +81,22 @@ class _VendedorHomeScreenState extends State<VendedorHomeScreen> {
               _buildSectionTitle('Rifas Activas'),
               const SizedBox(height: 12),
               ...rifasActivas.map((rifa) => _buildRifaCard(context, rifa, provider)),
+            ] else if (provider.rifasVisibles.isEmpty) ...[
+              _buildSectionTitle('Rifas Activas'),
+              const SizedBox(height: 16),
+              Center(
+                child: Column(
+                  children: [
+                    Icon(Icons.info_outline_rounded, size: 48, color: AppTheme.textSecondary.withValues(alpha: 0.5)),
+                    const SizedBox(height: 12),
+                    Text(
+                      'El administrador aún no te ha asignado rifas',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: AppTheme.textSecondary, fontSize: 14),
+                    ),
+                  ],
+                ),
+              ),
             ],
             const SizedBox(height: 24),
             if (misParticipantes.isNotEmpty) ...[

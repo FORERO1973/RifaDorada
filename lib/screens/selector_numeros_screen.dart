@@ -34,6 +34,7 @@ class _SelectorNumerosViewState extends State<_SelectorNumerosView>
   final TextEditingController _searchController = TextEditingController();
   int _currentPage = 0;
   String _searchQuery = '';
+  bool _carouselPaused = false;
   Timer? _timer;
   late AnimationController _pulseController;
   late Animation<double> _pulseAnimation;
@@ -67,8 +68,16 @@ class _SelectorNumerosViewState extends State<_SelectorNumerosView>
     super.dispose();
   }
 
+  void _onCarouselInteraction() {
+    setState(() => _carouselPaused = true);
+    Future.delayed(const Duration(seconds: 6), () {
+      if (mounted) setState(() => _carouselPaused = false);
+    });
+  }
+
   void _startTimer() {
     _timer = Timer.periodic(const Duration(seconds: 4), (timer) {
+      if (_carouselPaused) return;
       if (_pageController.hasClients) {
         final provider = context.read<RifaProvider>();
         final imagesCount = provider.rifaSeleccionada?.imagenes.length ?? 0;
@@ -397,7 +406,10 @@ class _SelectorNumerosViewState extends State<_SelectorNumerosView>
           PageView.builder(
             controller: _pageController,
             itemCount: rifa.imagenes.length,
-            onPageChanged: (index) => setState(() => _currentPage = index),
+            onPageChanged: (index) {
+              setState(() => _currentPage = index);
+              _onCarouselInteraction();
+            },
             itemBuilder: (context, index) {
               return _buildImageWidget(rifa.imagenes[index]);
             },

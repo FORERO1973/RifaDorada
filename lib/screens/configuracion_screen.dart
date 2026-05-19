@@ -8,6 +8,8 @@ import '../providers/auth_provider.dart';
 import '../providers/theme_provider.dart';
 import '../models/app_config.dart';
 import '../services/firebase_service.dart';
+import '../widgets/logout_helper.dart';
+import '../widgets/app_section_title.dart';
 
 class ConfiguracionScreen extends StatefulWidget {
   const ConfiguracionScreen({super.key});
@@ -184,10 +186,10 @@ class _ConfiguracionScreenState extends State<ConfiguracionScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _buildSectionTitle(context, 'Mi Cuenta', Icons.person_rounded),
+                  const AppSectionTitle(title: 'Mi Cuenta', icon: Icons.person_rounded),
                   _buildUserInfo(context),
                   const SizedBox(height: 28),
-                  _buildSectionTitle(context, 'Apariencia', Icons.palette_rounded),
+                  const AppSectionTitle(title: 'Apariencia', icon: Icons.palette_rounded),
                   _buildThemeToggle(context),
                   const SizedBox(height: 28),
                   Consumer<AuthProvider>(
@@ -195,7 +197,7 @@ class _ConfiguracionScreenState extends State<ConfiguracionScreen> {
                       if (!auth.esAdmin) return const SizedBox.shrink();
                       return Column(
                         children: [
-                          _buildSectionTitle(context, 'Chatbot WhatsApp', Icons.smart_toy_rounded),
+                          const AppSectionTitle(title: 'Chatbot WhatsApp', icon: Icons.smart_toy_rounded),
                           _buildChatbotSection(context),
                           const SizedBox(height: 28),
                         ],
@@ -207,20 +209,20 @@ class _ConfiguracionScreenState extends State<ConfiguracionScreen> {
                       final readOnly = !auth.esAdmin;
                       return Column(
                         children: [
-                          _buildSectionTitle(context, 'Datos del Usuario', Icons.business_rounded),
+                          const AppSectionTitle(title: 'Datos del Usuario', icon: Icons.business_rounded),
                           _buildUserDataSection(context, readOnly: readOnly),
                         ],
                       );
                     },
                   ),
                   const SizedBox(height: 28),
-                  _buildSectionTitle(context, 'Región', Icons.public_rounded),
+                  const AppSectionTitle(title: 'Región', icon: Icons.public_rounded),
                   _buildRegionInfo(context),
                   const SizedBox(height: 28),
-                  _buildSectionTitle(context, 'Sistema', Icons.info_outline_rounded),
+                  const AppSectionTitle(title: 'Sistema', icon: Icons.info_outline_rounded),
                   _buildAboutSection(context),
                   const SizedBox(height: 28),
-                  _buildSectionTitle(context, 'Cuenta', Icons.person_outline_rounded),
+                  const AppSectionTitle(title: 'Cuenta', icon: Icons.person_outline_rounded),
                   _buildAccountSection(context),
                   const SizedBox(height: 100),
                 ],
@@ -291,34 +293,6 @@ class _ConfiguracionScreenState extends State<ConfiguracionScreen> {
             ),
           ),
         ),
-      ),
-    );
-  }
-
-  Widget _buildSectionTitle(BuildContext context, String title, IconData icon) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: AppTheme.primaryColor.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Icon(icon, size: 18, color: AppTheme.primaryColor),
-          ),
-          const SizedBox(width: 12),
-          Text(
-            title.toUpperCase(),
-            style: GoogleFonts.outfit(
-              fontSize: 13,
-              fontWeight: FontWeight.w800,
-              letterSpacing: 1.5,
-              color: AppTheme.primaryColor,
-            ),
-          ),
-        ],
       ),
     );
   }
@@ -856,30 +830,6 @@ class _ConfiguracionScreenState extends State<ConfiguracionScreen> {
   }
 
   void _showLogoutDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Cerrar Sesión'),
-        content: const Text('¿Está seguro de cerrar sesión?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancelar'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              await context.read<AuthProvider>().logout();
-              if (context.mounted) {
-                Navigator.pop(context);
-              }
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.errorColor,
-            ),
-            child: const Text('Cerrar Sesión'),
-          ),
-        ],
-      ),
-    );
+    showLogoutDialog(context);
   }
 }

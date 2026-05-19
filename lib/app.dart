@@ -13,6 +13,7 @@ import 'screens/login_screen.dart';
 import 'screens/vendedor_home_screen.dart';
 import 'screens/vendedor_ventas_screen.dart';
 import 'screens/super_admin_screen.dart';
+import 'widgets/logout_helper.dart';
 
 class RifaDoradaApp extends StatelessWidget {
   const RifaDoradaApp({super.key});
@@ -132,23 +133,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
   }
 
   void _showLogoutDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Cerrar Sesión'),
-        content: const Text('¿Estás seguro de cerrar sesión?'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(ctx);
-              context.read<AuthProvider>().logout();
-            },
-            child: const Text('Cerrar Sesión'),
-          ),
-        ],
-      ),
-    );
+    showLogoutDialog(context);
   }
 
   @override
@@ -270,23 +255,7 @@ class _VendedorNavigationScreenState extends State<VendedorNavigationScreen>
   }
 
   void _showLogoutDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Cerrar Sesión'),
-        content: const Text('¿Estás seguro de cerrar sesión?'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(ctx);
-              context.read<AuthProvider>().logout();
-            },
-            child: const Text('Cerrar Sesión'),
-          ),
-        ],
-      ),
-    );
+    showLogoutDialog(context);
   }
 
   @override

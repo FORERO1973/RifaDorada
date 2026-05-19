@@ -9,6 +9,7 @@ import '../services/firebase_service.dart';
 import '../services/report_service.dart';
 import '../widgets/edit_rifa_dialog.dart';
 import 'sales_list_screen.dart';
+import '../widgets/logout_helper.dart';
 import 'admin_users_screen.dart';
 
 class AdminScreen extends StatefulWidget {
@@ -326,14 +327,31 @@ Widget _buildStatsSection(Map<String, dynamic> stats, Rifa rifa) {
   }
 
 
-  void _toggleRifaStatus(BuildContext context, rifa, RifaProvider provider) {
+  void _toggleRifaStatus(BuildContext context, Rifa rifa, RifaProvider provider) {
     final newStatus = !rifa.activa;
-    final updatedRifa = rifa.copyWith(activa: newStatus);
-    provider.actualizarRifa(updatedRifa);
-    
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(newStatus ? 'Rifa activada' : 'Rifa cerrada'),
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(newStatus ? 'Activar Rifa' : 'Cerrar Rifa'),
+        content: Text(newStatus
+            ? '¿Estás seguro de activar "${rifa.nombre}"?'
+            : '¿Estás seguro de cerrar "${rifa.nombre}"?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: newStatus ? AppTheme.secondaryColor : Colors.orange,
+            ),
+            onPressed: () {
+              provider.actualizarRifa(rifa.copyWith(activa: newStatus));
+              Navigator.pop(ctx);
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text(newStatus ? 'Rifa activada' : 'Rifa cerrada')),
+              );
+            },
+            child: Text(newStatus ? 'ACTIVAR' : 'CERRAR'),
+          ),
+        ],
       ),
     );
   }
@@ -416,28 +434,7 @@ Widget _buildStatsSection(Map<String, dynamic> stats, Rifa rifa) {
   }
 
   void _showLogoutDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Cerrar Sesión'),
-        content: const Text('¿Está seguro de cerrar sesión?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancelar'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              await context.read<AuthProvider>().logout();
-              if (context.mounted) {
-                Navigator.pop(context);
-              }
-            },
-            child: const Text('Cerrar Sesión'),
-          ),
-        ],
-      ),
-    );
+    showLogoutDialog(context);
   }
   void _showSetWinnerDialog(BuildContext context, Rifa rifa, RifaProvider provider) {
     final controller = TextEditingController();
