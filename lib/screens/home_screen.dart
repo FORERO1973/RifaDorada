@@ -1,20 +1,16 @@
-import 'dart:io';
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
-import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
-import 'package:image_picker/image_picker.dart';
-import 'package:http/http.dart' as http;
 import '../config/theme.dart';
 import '../config/constants.dart';
 import '../providers/rifa_provider.dart';
 import '../providers/auth_provider.dart';
 import '../widgets/rifa_card.dart';
+import '../widgets/edit_rifa_dialog.dart';
+import '../widgets/shimmer_loading.dart';
 import '../models/rifa.dart';
-import '../models/user.dart';
 import 'crear_rifa_screen.dart';
 import 'selector_numeros_screen.dart';
 
@@ -67,7 +63,9 @@ class _HomeScreenState extends State<HomeScreen>
     final provider = context.watch<RifaProvider>();
     return Scaffold(
       body: SafeArea(
-        child: CustomScrollView(
+        child: RefreshIndicator(
+            onRefresh: () => context.read<RifaProvider>().loadRifas(),
+            child: CustomScrollView(
           slivers: [
             SliverToBoxAdapter(
               child: Padding(
@@ -94,6 +92,7 @@ class _HomeScreenState extends State<HomeScreen>
             ),
             _buildRifasList(),
           ],
+        ),
         ),
       ),
     );
@@ -404,9 +403,34 @@ class _HomeScreenState extends State<HomeScreen>
     return Consumer<RifaProvider>(
       builder: (context, provider, child) {
         if (provider.isLoading) {
-          return const SliverFillRemaining(
+          return const SliverPadding(
+            padding: EdgeInsets.symmetric(horizontal: 20),
+            sliver: ShimmerLoading(itemCount: 3, itemHeight: 140),
+          );
+        }
+
+        if (provider.error != null) {
+          return SliverFillRemaining(
             child: Center(
-              child: CircularProgressIndicator(color: AppTheme.primaryColor),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.cloud_off_rounded, size: 64, color: AppTheme.errorColor.withValues(alpha: 0.6)),
+                  const SizedBox(height: 16),
+                  Text('Error al cargar', style: Theme.of(context).textTheme.titleLarge?.copyWith(color: AppTheme.textSecondary)),
+                  const SizedBox(height: 8),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 40),
+                    child: Text(provider.error!, textAlign: TextAlign.center, style: TextStyle(fontSize: 12, color: AppTheme.textSecondary)),
+                  ),
+                  const SizedBox(height: 24),
+                  ElevatedButton.icon(
+                    onPressed: () => context.read<RifaProvider>().loadRifas(),
+                    icon: const Icon(Icons.refresh, size: 18),
+                    label: const Text('Reintentar'),
+                  ),
+                ],
+              ),
             ),
           );
         }
@@ -498,318 +522,11 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   void _showEditDialog(BuildContext context, Rifa rifa, RifaProvider provider) {
-    final nombreController = TextEditingController(text: rifa.nombre);
-    final descripcionController = TextEditingController(text: rifa.descripcion);
-    final precioController = TextEditingController(text: rifa.precioNumero.toStringAsFixed(0));
-    final picker = ImagePicker();
-    List<String> editImages = List.from(rifa.imagenes);
-    bool saving = false;
-    String? selectedLoteria = rifa.loteria;
-    String? selectedDia = rifa.diaSorteo;
-    DateTime? selectedFecha = rifa.fechaSorteo;
-    List<UserModel> vendedores = [];
-    List<String> selectedVendedores = List.from(rifa.vendedoresAsignados);
-    bool loadingVendedores = true;
-
     showDialog(
       context: context,
-      builder: (dialogContext) => StatefulBuilder(
-        builder: (context, setState) {
-          final auth = context.read<AuthProvider>();
-          final isAdmin = auth.esAdmin;
-          if (isAdmin && loadingVendedores) {
-            auth.getUsersInOrg(auth.organizacionId!).then((users) {
-              if (dialogContext.mounted) {
-                setState(() {
-                  vendedores = users.where((u) => u.esVendedor && u.activo).toList();
-                  loadingVendedores = false;
-                });
-              }
-            });
-          }
-          return AlertDialog(
-          title: const Text('Editar Rifa'),
-          contentPadding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                TextField(
-                  controller: nombreController,
-                  style: const TextStyle(fontSize: 13),
-                  decoration: const InputDecoration(
-                    labelText: 'Nombre',
-                    isDense: true,
-                    contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                TextField(
-                  controller: descripcionController,
-                  style: const TextStyle(fontSize: 13),
-                  decoration: const InputDecoration(
-                    labelText: 'Descripción',
-                    isDense: true,
-                    contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                TextField(
-                  controller: precioController,
-                  keyboardType: TextInputType.number,
-                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                  style: const TextStyle(fontSize: 13),
-                  decoration: const InputDecoration(
-                    labelText: 'Precio (COP)',
-                    hintText: '0',
-                    isDense: true,
-                    contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                DropdownButtonFormField<String>(
-                  initialValue: selectedLoteria,
-                  isExpanded: true,
-                  style: TextStyle(fontSize: 13, color: AppTheme.textPrimary),
-                  decoration: const InputDecoration(
-                    labelText: 'Lotería',
-                    isDense: true,
-                    contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                  ),
-                  items: LoteriasColombia.principales.map((l) => DropdownMenuItem(value: l, child: Text(l, style: const TextStyle(fontSize: 13)))).toList(),
-                  onChanged: (val) => setState(() => selectedLoteria = val),
-                ),
-                const SizedBox(height: 8),
-                DropdownButtonFormField<String>(
-                  initialValue: selectedDia,
-                  isExpanded: true,
-                  style: TextStyle(fontSize: 13, color: AppTheme.textPrimary),
-                  decoration: const InputDecoration(
-                    labelText: 'Día de Sorteo',
-                    isDense: true,
-                    contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                  ),
-                  items: LoteriasColombia.diasSemana.map((d) => DropdownMenuItem(value: d, child: Text(d, style: const TextStyle(fontSize: 13)))).toList(),
-                  onChanged: (val) => setState(() => selectedDia = val),
-                ),
-                const SizedBox(height: 8),
-                TextButton.icon(
-                  onPressed: () async {
-                    final picked = await showDatePicker(
-                      context: context,
-                      initialDate: selectedFecha ?? DateTime.now(),
-                      firstDate: DateTime.now().subtract(const Duration(days: 365)),
-                      lastDate: DateTime.now().add(const Duration(days: 365)),
-                    );
-                    if (picked != null) setState(() => selectedFecha = picked);
-                  },
-                  icon: const Icon(Icons.calendar_today, size: 16),
-                  label: Text(
-                    selectedFecha != null ? 'Sorteo: ${DateFormat('dd/MM/yyyy').format(selectedFecha!)}' : 'Seleccionar fecha',
-                    style: const TextStyle(fontSize: 12),
-                  ),
-                  style: TextButton.styleFrom(
-                    backgroundColor: AppTheme.surfaceColor,
-                    foregroundColor: AppTheme.textPrimary,
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                    shape: RoundedRectangleBorder(
-                      side: BorderSide(color: AppTheme.dividerColor),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Text('Imágenes', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppTheme.textSecondary)),
-                const SizedBox(height: 6),
-                if (editImages.isNotEmpty)
-                  SizedBox(
-                    height: 60,
-                    child: SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      child: Row(
-                        children: [
-                          ...editImages.map((img) => Padding(
-                            padding: const EdgeInsets.only(right: 6),
-                            child: Stack(
-                              children: [
-                                _buildThumbnail(img, 60),
-                                Positioned(
-                                  top: 0, right: 0,
-                                  child: GestureDetector(
-                                    onTap: () => setState(() => editImages.remove(img)),
-                                    child: Container(
-                                      decoration: BoxDecoration(color: AppTheme.errorColor, shape: BoxShape.circle),
-                                      child: const Icon(Icons.close, size: 14, color: Colors.white),
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          )),
-                          if (editImages.length < 5)
-                            GestureDetector(
-                              onTap: () async {
-                                final image = await picker.pickImage(source: ImageSource.gallery, maxWidth: 1024, maxHeight: 1024, imageQuality: 80);
-                                if (image != null) setState(() => editImages.add(image.path));
-                              },
-                              child: Container(
-                                width: 60, height: 60,
-                                decoration: BoxDecoration(
-                                  color: AppTheme.surfaceColor,
-                                  borderRadius: BorderRadius.circular(8),
-                                  border: Border.all(color: AppTheme.dividerColor),
-                                ),
-                                child: Icon(Icons.add_photo_alternate_outlined, color: AppTheme.textSecondary, size: 24),
-                              ),
-                            ),
-                        ],
-                      ),
-                    ),
-                  )
-                else
-                  GestureDetector(
-                    onTap: () async {
-                      final image = await picker.pickImage(source: ImageSource.gallery, maxWidth: 1024, maxHeight: 1024, imageQuality: 80);
-                      if (image != null) setState(() => editImages.add(image.path));
-                    },
-                    child: Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      decoration: BoxDecoration(
-                        color: AppTheme.surfaceColor,
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: AppTheme.dividerColor, style: BorderStyle.solid),
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.add_photo_alternate_outlined, color: AppTheme.textSecondary, size: 18),
-                          const SizedBox(width: 6),
-                          Text('Agregar imágenes', style: TextStyle(fontSize: 12, color: AppTheme.textSecondary)),
-                        ],
-                      ),
-                    ),
-                  ),
-                if (isAdmin) ...[
-                  const SizedBox(height: 16),
-                  Text('Asignar Vendedores', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppTheme.textSecondary)),
-                  const SizedBox(height: 6),
-                  if (loadingVendedores)
-                    const Padding(
-                      padding: EdgeInsets.symmetric(vertical: 8),
-                      child: Center(child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))),
-                    )
-                  else if (vendedores.isEmpty)
-                    Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 4),
-                      child: Text('No hay vendedores activos en tu organización', style: TextStyle(fontSize: 11, color: AppTheme.textSecondary)),
-                    )
-                  else
-                    ...vendedores.map((v) => CheckboxListTile(
-                      dense: true,
-                      visualDensity: VisualDensity.compact,
-                      contentPadding: EdgeInsets.zero,
-                      title: Text(v.nombre, style: const TextStyle(fontSize: 13)),
-                      subtitle: Text(v.email, style: TextStyle(fontSize: 10, color: AppTheme.textSecondary)),
-                      value: selectedVendedores.contains(v.uid),
-                      onChanged: (checked) {
-                        setState(() {
-                          if (checked == true) {
-                            selectedVendedores.add(v.uid);
-                          } else {
-                            selectedVendedores.remove(v.uid);
-                          }
-                        });
-                      },
-                    )),
-                ],
-              ],
-            ),
-          ),
-          actionsPadding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext),
-              child: const Text('Cancelar', style: TextStyle(fontSize: 13)),
-            ),
-            ElevatedButton(
-              onPressed: saving ? null : () async {
-                setState(() => saving = true);
-                try {
-                  List<String> finalImages = List.from(editImages);
-                  final localPaths = finalImages.where((p) => !p.startsWith('http') && !p.startsWith('data:') && !p.startsWith('blob:') && !kIsWeb).toList();
-                  if (localPaths.isNotEmpty) {
-                    try {
-                      final uri = Uri.parse('${AppConstants.chatbotApi}/upload-images');
-                      final base64List = <String>[];
-                      for (final path in localPaths) {
-                        final bytes = await File(path).readAsBytes();
-                        base64List.add(base64Encode(bytes));
-                      }
-                      final response = await http.post(uri, headers: {'Content-Type': 'application/json'}, body: jsonEncode({'images': base64List}));
-                      if (response.statusCode == 200) {
-                        final urls = List<String>.from(jsonDecode(response.body)['urls']);
-                        int urlIdx = 0;
-                        finalImages = finalImages.map((p) {
-                          if (localPaths.contains(p)) return urls[urlIdx++];
-                          return p;
-                        }).toList();
-                      }
-                    } catch (_) {
-                      finalImages = finalImages.map((p) {
-                        if (localPaths.contains(p)) return 'data:image/jpeg;base64,${base64Encode(File(p).readAsBytesSync())}';
-                        return p;
-                      }).toList();
-                    }
-                  }
-                  final precio = double.tryParse(precioController.text.replaceAll(RegExp(r'[^0-9]'), '')) ?? rifa.precioNumero;
-                  final updatedRifa = rifa.copyWith(
-                    nombre: nombreController.text,
-                    descripcion: descripcionController.text,
-                    precioNumero: precio,
-                    loteria: selectedLoteria,
-                    diaSorteo: selectedDia,
-                    fechaSorteo: selectedFecha,
-                    imagenes: finalImages,
-                    vendedoresAsignados: selectedVendedores,
-                  );
-                  await provider.actualizarRifa(updatedRifa);
-                  if (dialogContext.mounted) Navigator.pop(dialogContext);
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Rifa actualizada')));
-                  }
-                } catch (e) {
-                  setState(() => saving = false);
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e'), backgroundColor: AppTheme.errorColor));
-                  }
-                }
-              },
-              child: saving
-                    ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
-                    : const Text('Guardar', style: TextStyle(fontSize: 13)),
-              ),
-            ],
-          );
-        },
-      ),
+      builder: (_) => EditRifaDialog(rifa: rifa, provider: provider),
     );
   }
-
-  Widget _buildThumbnail(String path, double size) {
-    Widget child;
-    if (path.startsWith('http') || path.startsWith('blob:')) {
-      child = Image.network(path, fit: BoxFit.cover, width: size, height: size);
-    } else if (path.startsWith('data:image/')) {
-      final b64 = path.contains('base64,') ? path.split('base64,')[1] : path;
-      child = Image.memory(base64Decode(b64), fit: BoxFit.cover, width: size, height: size);
-    } else {
-      child = Image.file(File(path), fit: BoxFit.cover, width: size, height: size);
-    }
-    return ClipRRect(borderRadius: BorderRadius.circular(8), child: child);
-  }
-
 
   void _confirmDeleteRifa(BuildContext context, Rifa rifa, RifaProvider provider) {
     showDialog(

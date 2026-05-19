@@ -52,26 +52,45 @@ class _VendedorHomeScreenState extends State<VendedorHomeScreen> {
         title: const Text('Mis Ventas', style: TextStyle(fontWeight: FontWeight.bold)),
         elevation: 0,
       ),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          _buildGreeting(user?.nombre ?? 'Vendedor'),
-          const SizedBox(height: 24),
-          _buildQuickStats(misParticipantes),
-          const SizedBox(height: 24),
-          if (rifasActivas.isNotEmpty) ...[
-            _buildSectionTitle('Rifas Activas'),
-            const SizedBox(height: 12),
-            ...rifasActivas.map((rifa) => _buildRifaCard(context, rifa, provider)),
+      body: RefreshIndicator(
+        onRefresh: () async {
+          final provider = context.read<RifaProvider>();
+          final auth = context.read<AuthProvider>();
+          await provider.loadRifas();
+          if (provider.rifasVisibles.isNotEmpty) {
+            final vendedorId = auth.currentUser?.uid;
+            List<Participante> all = [];
+            for (final r in provider.rifasVisibles) {
+              try {
+                final pList = await FirebaseService.instance
+                    .getParticipantesOnce(r.id, vendedorId: vendedorId);
+                all.addAll(pList);
+              } catch (_) {}
+            }
+            provider.setParticipantes(all);
+          }
+        },
+        child: ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            _buildGreeting(user?.nombre ?? 'Vendedor'),
+            const SizedBox(height: 24),
+            _buildQuickStats(misParticipantes),
+            const SizedBox(height: 24),
+            if (rifasActivas.isNotEmpty) ...[
+              _buildSectionTitle('Rifas Activas'),
+              const SizedBox(height: 12),
+              ...rifasActivas.map((rifa) => _buildRifaCard(context, rifa, provider)),
+            ],
+            const SizedBox(height: 24),
+            if (misParticipantes.isNotEmpty) ...[
+              _buildSectionTitle('Últimas Ventas'),
+              const SizedBox(height: 12),
+              ...misParticipantes.take(5).map((p) => _buildVentaItem(context, p, provider)),
+            ],
+            const SizedBox(height: 100),
           ],
-          const SizedBox(height: 24),
-          if (misParticipantes.isNotEmpty) ...[
-            _buildSectionTitle('Últimas Ventas'),
-            const SizedBox(height: 12),
-            ...misParticipantes.take(5).map((p) => _buildVentaItem(context, p, provider)),
-          ],
-          const SizedBox(height: 100),
-        ],
+        ),
       ),
     );
   }

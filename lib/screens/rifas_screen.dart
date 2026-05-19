@@ -10,6 +10,7 @@ import '../models/rifa.dart';
 import '../models/participante.dart';
 import '../services/firebase_service.dart';
 import '../widgets/rifa_card.dart';
+import '../widgets/edit_rifa_dialog.dart';
 import 'crear_rifa_screen.dart';
 import 'ticket_screen.dart';
 
@@ -147,125 +148,42 @@ class _RifasActivasTab extends StatelessWidget {
           );
         }
 
-        return ListView.builder(
-          padding: const EdgeInsets.all(16),
-          itemCount: rifasActivas.length,
-          itemBuilder: (context, index) {
-            final rifa = rifasActivas[index];
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 16),
-              child: RifaCard(
-                rifa: rifa,
-                showDetails: true,
-                onEdit: () => _showEditDialog(context, rifa, provider),
-                onDelete: () => _confirmDeleteRifa(context, rifa, provider),
-                onTap: () {
-                  provider.setRifaSeleccionada(rifa);
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => const _RifaDetalleScreen(),
-                    ),
-                  );
-                },
-              ),
-            );
-          },
+        return RefreshIndicator(
+          onRefresh: () => provider.loadRifas(),
+          child: ListView.builder(
+            padding: const EdgeInsets.all(16),
+            itemCount: rifasActivas.length,
+            itemBuilder: (context, index) {
+              final rifa = rifasActivas[index];
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 16),
+                child: RifaCard(
+                  rifa: rifa,
+                  showDetails: true,
+                  onEdit: () => _showEditDialog(context, rifa, provider),
+                  onDelete: () => _confirmDeleteRifa(context, rifa, provider),
+                  onTap: () {
+                    provider.setRifaSeleccionada(rifa);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const _RifaDetalleScreen(),
+                      ),
+                    );
+                  },
+                ),
+              );
+            },
+          ),
         );
       },
     );
   }
 
   void _showEditDialog(BuildContext context, Rifa rifa, RifaProvider provider) {
-    final nombreController = TextEditingController(text: rifa.nombre);
-    final descripcionController = TextEditingController(text: rifa.descripcion);
-    final precioController = TextEditingController(text: rifa.precioNumero.toString());
-    String? selectedLoteria = rifa.loteria;
-    String? selectedDia = rifa.diaSorteo;
-    DateTime? selectedFecha = rifa.fechaSorteo;
-
     showDialog(
       context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setState) => AlertDialog(
-          title: const Text('Editar Rifa'),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(
-                  controller: nombreController,
-                  decoration: const InputDecoration(labelText: 'Nombre'),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: descripcionController,
-                  decoration: const InputDecoration(labelText: 'Descripción'),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: precioController,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(labelText: 'Precio'),
-                ),
-                const SizedBox(height: 12),
-                DropdownButtonFormField<String>(
-                  initialValue: selectedLoteria,
-                  decoration: const InputDecoration(labelText: 'Lotería'),
-                  items: LoteriasColombia.principales.map((l) => DropdownMenuItem(value: l, child: Text(l))).toList(),
-                  onChanged: (val) => setState(() => selectedLoteria = val),
-                ),
-                const SizedBox(height: 12),
-                DropdownButtonFormField<String>(
-                  initialValue: selectedDia,
-                  decoration: const InputDecoration(labelText: 'Día de Sorteo'),
-                  items: LoteriasColombia.diasSemana.map((d) => DropdownMenuItem(value: d, child: Text(d))).toList(),
-                  onChanged: (val) => setState(() => selectedDia = val),
-                ),
-                const SizedBox(height: 12),
-                ListTile(
-                  title: const Text('Fecha de Sorteo'),
-                  subtitle: Text(selectedFecha != null ? DateFormat('dd/MM/yyyy').format(selectedFecha!) : 'No seleccionada'),
-                  trailing: const Icon(Icons.calendar_today),
-                  onTap: () async {
-                    final picked = await showDatePicker(
-                      context: context,
-                      initialDate: selectedFecha ?? DateTime.now(),
-                      firstDate: DateTime.now().subtract(const Duration(days: 365)),
-                      lastDate: DateTime.now().add(const Duration(days: 365)),
-                    );
-                    if (picked != null) setState(() => selectedFecha = picked);
-                  },
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancelar'),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                final updatedRifa = rifa.copyWith(
-                  nombre: nombreController.text,
-                  descripcion: descripcionController.text,
-                  precioNumero: double.tryParse(precioController.text) ?? rifa.precioNumero,
-                  loteria: selectedLoteria,
-                  diaSorteo: selectedDia,
-                  fechaSorteo: selectedFecha,
-                );
-                provider.actualizarRifa(updatedRifa);
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Rifa actualizada')),
-                );
-              },
-              child: const Text('Guardar'),
-            ),
-          ],
-        ),
-      ),
+      builder: (_) => EditRifaDialog(rifa: rifa, provider: provider),
     );
   }
 
@@ -317,20 +235,23 @@ class _RifasCerradasTab extends StatelessWidget {
           );
         }
 
-        return ListView.builder(
-          padding: const EdgeInsets.all(16),
-          itemCount: rifasCerradas.length,
-          itemBuilder: (context, index) {
-            final rifa = rifasCerradas[index];
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 16),
-              child: RifaCard(
-                rifa: rifa,
-                showDetails: true,
-                onTap: () {},
-              ),
-            );
-          },
+        return RefreshIndicator(
+          onRefresh: () => provider.loadRifas(),
+          child: ListView.builder(
+            padding: const EdgeInsets.all(16),
+            itemCount: rifasCerradas.length,
+            itemBuilder: (context, index) {
+              final rifa = rifasCerradas[index];
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 16),
+                child: RifaCard(
+                  rifa: rifa,
+                  showDetails: true,
+                  onTap: () {},
+                ),
+              );
+            },
+          ),
         );
       },
     );

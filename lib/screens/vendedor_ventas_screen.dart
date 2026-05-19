@@ -81,37 +81,46 @@ class _VendedorVentasScreenState extends State<VendedorVentasScreen> {
         children: [
           _buildFilters(provider),
           Expanded(
-            child: Consumer<RifaProvider>(
-              builder: (context, provider, child) {
-                final filtered = provider.participantes.where((p) {
-                  final matchesSearch = p.nombre.toLowerCase().contains(_searchQuery.toLowerCase()) ||
-                      p.whatsapp.contains(_searchQuery) ||
-                      p.numeros.any((n) => n.contains(_searchQuery));
-                  final matchesRifa = _filterRifaId == 'todas' || p.rifaId == _filterRifaId;
-                  return matchesSearch && matchesRifa;
-                }).toList();
-
-                if (filtered.isEmpty) {
-                  return Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.search_off, size: 64, color: AppTheme.textSecondary.withValues(alpha: 0.5)),
-                        const SizedBox(height: 16),
-                        Text('No se encontraron clientes', style: TextStyle(color: AppTheme.textSecondary)),
-                      ],
-                    ),
-                  );
+            child: RefreshIndicator(
+              onRefresh: () async {
+                final provider = context.read<RifaProvider>();
+                await provider.loadRifas();
+                if (provider.rifasVisibles.isNotEmpty) {
+                  await _loadParticipantsForFilter(provider);
                 }
-
-                return ListView.builder(
-                  padding: const EdgeInsets.all(16),
-                  itemCount: filtered.length,
-                  itemBuilder: (context, index) {
-                    return _buildClienteCard(filtered[index], provider);
-                  },
-                );
               },
+              child: Consumer<RifaProvider>(
+                builder: (context, provider, child) {
+                  final filtered = provider.participantes.where((p) {
+                    final matchesSearch = p.nombre.toLowerCase().contains(_searchQuery.toLowerCase()) ||
+                        p.whatsapp.contains(_searchQuery) ||
+                        p.numeros.any((n) => n.contains(_searchQuery));
+                    final matchesRifa = _filterRifaId == 'todas' || p.rifaId == _filterRifaId;
+                    return matchesSearch && matchesRifa;
+                  }).toList();
+
+                  if (filtered.isEmpty) {
+                    return Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.search_off, size: 64, color: AppTheme.textSecondary.withValues(alpha: 0.5)),
+                          const SizedBox(height: 16),
+                          Text('No se encontraron clientes', style: TextStyle(color: AppTheme.textSecondary)),
+                        ],
+                      ),
+                    );
+                  }
+
+                  return ListView.builder(
+                    padding: const EdgeInsets.all(16),
+                    itemCount: filtered.length,
+                    itemBuilder: (context, index) {
+                      return _buildClienteCard(filtered[index], provider);
+                    },
+                  );
+                },
+              ),
             ),
           ),
         ],
