@@ -9,7 +9,6 @@ import '../providers/theme_provider.dart';
 import '../models/app_config.dart';
 import '../services/firebase_service.dart';
 import '../widgets/logout_helper.dart';
-import '../widgets/app_section_title.dart';
 
 class ConfiguracionScreen extends StatefulWidget {
   const ConfiguracionScreen({super.key});
@@ -32,6 +31,16 @@ class _ConfiguracionScreenState extends State<ConfiguracionScreen> {
   String _metodoPago = 'nequi';
   bool _isSavingConfig = false;
   bool _isLoadingConfig = true;
+
+  final Map<String, bool> _expandedSections = {
+    'perfil': true,
+    'apariencia': false,
+    'chatbot': false,
+    'datos': false,
+    'region': false,
+    'sistema': false,
+    'cuenta': false,
+  };
 
   @override
   void initState() {
@@ -97,19 +106,13 @@ class _ConfiguracionScreenState extends State<ConfiguracionScreen> {
       }
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('✅ Datos guardados correctamente'),
-            backgroundColor: AppTheme.secondaryColor,
-          ),
+          const SnackBar(content: Text('✅ Datos guardados correctamente'), backgroundColor: AppTheme.secondaryColor),
         );
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('⚠️ Error al guardar: $e'),
-            backgroundColor: Colors.orange,
-          ),
+          SnackBar(content: Text('⚠️ Error al guardar: $e'), backgroundColor: Colors.orange),
         );
       }
     } finally {
@@ -118,38 +121,21 @@ class _ConfiguracionScreenState extends State<ConfiguracionScreen> {
   }
 
   Future<void> _testChatbotConnection() async {
-    setState(() {
-      _isTesting = true;
-      _connectionStatus = null;
-      _connectionSuccess = null;
-    });
-
+    setState(() { _isTesting = true; _connectionStatus = null; _connectionSuccess = null; });
     try {
       final url = _chatbotUrlController.text.trim();
       final cleanUrl = url.endsWith('/') ? url.substring(0, url.length - 1) : url;
       final testUri = '$cleanUrl/v1/rifas';
       debugPrint('[CONFIG] Probando conexión a: $testUri');
-
-      final response = await http.get(Uri.parse(testUri))
-          .timeout(const Duration(seconds: 5));
-
+      final response = await http.get(Uri.parse(testUri)).timeout(const Duration(seconds: 5));
       if (response.statusCode == 200) {
-        setState(() {
-          _connectionSuccess = true;
-          _connectionStatus = '✅ Conexión exitosa';
-        });
+        setState(() { _connectionSuccess = true; _connectionStatus = '✅ Conexión exitosa'; });
       } else {
-        setState(() {
-          _connectionSuccess = false;
-          _connectionStatus = '❌ Error: Servidor respondió ${response.statusCode}';
-        });
+        setState(() { _connectionSuccess = false; _connectionStatus = '❌ Error: Servidor respondió ${response.statusCode}'; });
       }
     } catch (e) {
       debugPrint('[CONFIG] Error de conexión: $e');
-      setState(() {
-        _connectionSuccess = false;
-        _connectionStatus = '❌ $e';
-      });
+      setState(() { _connectionSuccess = false; _connectionStatus = '❌ $e'; });
     } finally {
       setState(() => _isTesting = false);
     }
@@ -158,20 +144,17 @@ class _ConfiguracionScreenState extends State<ConfiguracionScreen> {
   Future<void> _saveChatbotUrl() async {
     final url = _chatbotUrlController.text.trim();
     if (url.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Ingresa una URL válida')),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Ingresa una URL válida')));
       return;
     }
     await AppConstants.setChatbotUrl(url);
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('✅ URL del chatbot actualizada'),
-          backgroundColor: AppTheme.secondaryColor,
-        ),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('✅ URL del chatbot actualizada'), backgroundColor: AppTheme.secondaryColor));
     }
+  }
+
+  void _toggleSection(String key) {
+    setState(() => _expandedSections[key] = !(_expandedSections[key] ?? false));
   }
 
   @override
@@ -182,48 +165,77 @@ class _ConfiguracionScreenState extends State<ConfiguracionScreen> {
           _buildSliverHeader(context),
           SliverToBoxAdapter(
             child: Padding(
-              padding: const EdgeInsets.all(20),
+              padding: const EdgeInsets.all(16),
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const AppSectionTitle(title: 'Mi Cuenta', icon: Icons.person_rounded),
-                  _buildUserInfo(context),
-                  const SizedBox(height: 28),
-                  const AppSectionTitle(title: 'Apariencia', icon: Icons.palette_rounded),
-                  _buildThemeToggle(context),
-                  const SizedBox(height: 28),
+                  _buildCollapsibleSection(
+                    key: 'perfil',
+                    title: 'Mi Perfil',
+                    icon: Icons.person_rounded,
+                    iconColor: AppTheme.primaryColor,
+                    child: _buildUserInfo(context),
+                  ),
+                  const SizedBox(height: 12),
+                  _buildCollapsibleSection(
+                    key: 'apariencia',
+                    title: 'Apariencia',
+                    icon: Icons.palette_rounded,
+                    iconColor: Colors.purple,
+                    child: _buildThemeToggle(context),
+                  ),
+                  const SizedBox(height: 12),
                   Consumer<AuthProvider>(
                     builder: (context, auth, _) {
                       if (!auth.esAdmin) return const SizedBox.shrink();
                       return Column(
                         children: [
-                          const AppSectionTitle(title: 'Chatbot WhatsApp', icon: Icons.smart_toy_rounded),
-                          _buildChatbotSection(context),
-                          const SizedBox(height: 28),
+                          _buildCollapsibleSection(
+                            key: 'chatbot',
+                            title: 'Chatbot WhatsApp',
+                            icon: Icons.chat_rounded,
+                            iconColor: Colors.green,
+                            child: _buildChatbotSection(context),
+                          ),
+                          const SizedBox(height: 12),
                         ],
                       );
                     },
                   ),
                   Consumer<AuthProvider>(
                     builder: (context, auth, _) {
-                      final readOnly = !auth.esAdmin;
-                      return Column(
-                        children: [
-                          const AppSectionTitle(title: 'Datos del Usuario', icon: Icons.business_rounded),
-                          _buildUserDataSection(context, readOnly: readOnly),
-                        ],
+                      return _buildCollapsibleSection(
+                        key: 'datos',
+                        title: 'Datos del Negocio',
+                        icon: Icons.business_rounded,
+                        iconColor: Colors.blue,
+                        child: _buildUserDataSection(context, readOnly: !auth.esAdmin),
                       );
                     },
                   ),
-                  const SizedBox(height: 28),
-                  const AppSectionTitle(title: 'Región', icon: Icons.public_rounded),
-                  _buildRegionInfo(context),
-                  const SizedBox(height: 28),
-                  const AppSectionTitle(title: 'Sistema', icon: Icons.info_outline_rounded),
-                  _buildAboutSection(context),
-                  const SizedBox(height: 28),
-                  const AppSectionTitle(title: 'Cuenta', icon: Icons.person_outline_rounded),
-                  _buildAccountSection(context),
+                  const SizedBox(height: 12),
+                  _buildCollapsibleSection(
+                    key: 'region',
+                    title: 'Región',
+                    icon: Icons.public_rounded,
+                    iconColor: Colors.teal,
+                    child: _buildRegionInfo(context),
+                  ),
+                  const SizedBox(height: 12),
+                  _buildCollapsibleSection(
+                    key: 'sistema',
+                    title: 'Sistema',
+                    icon: Icons.info_outline_rounded,
+                    iconColor: Colors.cyan,
+                    child: _buildAboutSection(context),
+                  ),
+                  const SizedBox(height: 12),
+                  _buildCollapsibleSection(
+                    key: 'cuenta',
+                    title: 'Sesión',
+                    icon: Icons.logout_rounded,
+                    iconColor: AppTheme.errorColor,
+                    child: _buildAccountSection(context),
+                  ),
                   const SizedBox(height: 100),
                 ],
               ),
@@ -234,9 +246,75 @@ class _ConfiguracionScreenState extends State<ConfiguracionScreen> {
     );
   }
 
+  Widget _buildCollapsibleSection({
+    required String key,
+    required String title,
+    required IconData icon,
+    required Color iconColor,
+    required Widget child,
+  }) {
+    final isExpanded = _expandedSections[key] ?? false;
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeInOutCubic,
+      decoration: BoxDecoration(
+        color: AppTheme.cardColor,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: isExpanded ? iconColor.withValues(alpha: 0.3) : AppTheme.dividerColor),
+      ),
+      child: Column(
+        children: [
+          Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: () => _toggleSection(key),
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: iconColor.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Icon(icon, color: iconColor, size: 20),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        title,
+                        style: GoogleFonts.outfit(fontWeight: FontWeight.w700, fontSize: 14),
+                      ),
+                    ),
+                    AnimatedRotation(
+                      turns: isExpanded ? 0.5 : 0,
+                      duration: const Duration(milliseconds: 300),
+                      child: Icon(Icons.expand_more_rounded, color: iconColor, size: 22),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          AnimatedCrossFade(
+            firstChild: const SizedBox.shrink(),
+            secondChild: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+              child: child,
+            ),
+            crossFadeState: isExpanded ? CrossFadeState.showSecond : CrossFadeState.showFirst,
+            duration: const Duration(milliseconds: 300),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildSliverHeader(BuildContext context) {
     return SliverAppBar(
-      expandedHeight: 180,
+      expandedHeight: 140,
       floating: false,
       pinned: true,
       backgroundColor: AppTheme.surfaceColor,
@@ -246,48 +324,31 @@ class _ConfiguracionScreenState extends State<ConfiguracionScreen> {
             gradient: LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
-              colors: [
-                AppTheme.primaryColor.withValues(alpha: 0.08),
-                AppTheme.surfaceColor,
-              ],
+              colors: [AppTheme.primaryColor.withValues(alpha: 0.08), AppTheme.surfaceColor],
             ),
           ),
           child: SafeArea(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const SizedBox(height: 20),
+                const SizedBox(height: 16),
                 Container(
-                  padding: const EdgeInsets.all(16),
+                  padding: const EdgeInsets.all(14),
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     color: AppTheme.primaryColor.withValues(alpha: 0.1),
-                    border: Border.all(
-                      color: AppTheme.primaryColor.withValues(alpha: 0.3),
-                      width: 2,
-                    ),
+                    border: Border.all(color: AppTheme.primaryColor.withValues(alpha: 0.3), width: 2),
                   ),
-                  child: const Icon(
-                    Icons.settings_rounded,
-                    color: AppTheme.primaryColor,
-                    size: 32,
-                  ),
+                  child: const Icon(Icons.tune_rounded, color: AppTheme.primaryColor, size: 28),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 10),
                 Text(
                   'Configuración',
-                  style: GoogleFonts.outfit(
-                    fontSize: 24,
-                    fontWeight: FontWeight.w900,
-                    color: AppTheme.textPrimary,
-                  ),
+                  style: GoogleFonts.outfit(fontSize: 22, fontWeight: FontWeight.w900, color: AppTheme.textPrimary),
                 ),
                 Text(
                   'v${AppConstants.appVersion}',
-                  style: GoogleFonts.outfit(
-                    fontSize: 12,
-                    color: AppTheme.textSecondary,
-                  ),
+                  style: GoogleFonts.outfit(fontSize: 11, color: AppTheme.textSecondary),
                 ),
               ],
             ),
@@ -306,26 +367,26 @@ class _ConfiguracionScreenState extends State<ConfiguracionScreen> {
         return Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: AppTheme.cardColor,
-            borderRadius: BorderRadius.circular(20),
+            color: AppTheme.surfaceColor,
+            borderRadius: BorderRadius.circular(16),
             border: Border.all(color: AppTheme.dividerColor),
           ),
           child: Row(
             children: [
               CircleAvatar(
-                radius: 28,
+                radius: 26,
                 backgroundColor: AppTheme.primaryColor.withValues(alpha: 0.2),
                 child: Text(
                   user.nombre.isNotEmpty ? user.nombre[0].toUpperCase() : 'U',
-                  style: GoogleFonts.outfit(fontSize: 24, fontWeight: FontWeight.w900, color: AppTheme.primaryColor),
+                  style: GoogleFonts.outfit(fontSize: 22, fontWeight: FontWeight.w900, color: AppTheme.primaryColor),
                 ),
               ),
-              const SizedBox(width: 16),
+              const SizedBox(width: 14),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(user.nombre, style: GoogleFonts.outfit(fontWeight: FontWeight.w700, fontSize: 16)),
+                    Text(user.nombre, style: GoogleFonts.outfit(fontWeight: FontWeight.w700, fontSize: 15)),
                     Text(user.email, style: TextStyle(fontSize: 12, color: AppTheme.textSecondary)),
                     const SizedBox(height: 4),
                     Container(
@@ -354,124 +415,65 @@ class _ConfiguracionScreenState extends State<ConfiguracionScreen> {
   }
 
   Widget _buildChatbotSection(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppTheme.cardColor,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppTheme.dividerColor),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'URL del Servidor',
-            style: GoogleFonts.outfit(
-              fontWeight: FontWeight.w700,
-              fontSize: 14,
-            ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('URL del Servidor', style: GoogleFonts.outfit(fontWeight: FontWeight.w700, fontSize: 13)),
+        const SizedBox(height: 4),
+        Text('Dirección del servidor del chatbot de WhatsApp', style: GoogleFonts.outfit(fontSize: 11, color: AppTheme.textSecondary)),
+        const SizedBox(height: 10),
+        TextField(
+          controller: _chatbotUrlController,
+          style: GoogleFonts.outfit(fontWeight: FontWeight.w600, fontSize: 13),
+          decoration: InputDecoration(
+            hintText: 'http://192.168.200.107:3008',
+            prefixIcon: const Icon(Icons.link_rounded, size: 18),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
           ),
-          const SizedBox(height: 4),
-          Text(
-            'Dirección del servidor del chatbot de WhatsApp',
-            style: GoogleFonts.outfit(
-              fontSize: 12,
-              color: AppTheme.textSecondary,
-            ),
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: _chatbotUrlController,
-            style: GoogleFonts.outfit(fontWeight: FontWeight.w600, fontSize: 14),
-            decoration: InputDecoration(
-              hintText: 'http://192.168.200.107:3008',
-              prefixIcon: const Icon(Icons.link_rounded, size: 20),
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
+        ),
+        const SizedBox(height: 10),
+        Row(
+          children: [
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: _isTesting ? null : _testChatbotConnection,
+                icon: _isTesting ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.wifi_find_rounded, size: 16),
+                label: Text(_isTesting ? 'Probando...' : 'Probar'),
+                style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 12), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
               ),
             ),
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: _isTesting ? null : _testChatbotConnection,
-                  icon: _isTesting
-                      ? const SizedBox(
-                          width: 16, height: 16,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Icon(Icons.wifi_find_rounded, size: 18),
-                  label: Text(_isTesting ? 'Probando...' : 'Probar Conexión'),
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: ElevatedButton.icon(
-                  onPressed: _saveChatbotUrl,
-                  icon: const Icon(Icons.save_rounded, size: 18),
-                  label: const Text('Guardar'),
-                  style: ElevatedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-          if (_connectionStatus != null) ...[
-            const SizedBox(height: 12),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: (_connectionSuccess == true
-                        ? Colors.green
-                        : Colors.red)
-                    .withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: (_connectionSuccess == true
-                          ? Colors.green
-                          : Colors.red)
-                      .withValues(alpha: 0.3),
-                ),
-              ),
-              child: Row(
-                children: [
-                  Icon(
-                    _connectionSuccess == true
-                        ? Icons.check_circle_rounded
-                        : Icons.error_rounded,
-                    color: _connectionSuccess == true ? Colors.green : Colors.red,
-                    size: 20,
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      _connectionStatus!,
-                      style: GoogleFonts.outfit(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                ],
+            const SizedBox(width: 10),
+            Expanded(
+              child: ElevatedButton.icon(
+                onPressed: _saveChatbotUrl,
+                icon: const Icon(Icons.save_rounded, size: 16),
+                label: const Text('Guardar'),
+                style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 12), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
               ),
             ),
           ],
+        ),
+        if (_connectionStatus != null) ...[
+          const SizedBox(height: 10),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: (_connectionSuccess == true ? Colors.green : Colors.red).withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: (_connectionSuccess == true ? Colors.green : Colors.red).withValues(alpha: 0.3)),
+            ),
+            child: Row(
+              children: [
+                Icon(_connectionSuccess == true ? Icons.check_circle_rounded : Icons.error_rounded, color: _connectionSuccess == true ? Colors.green : Colors.red, size: 18),
+                const SizedBox(width: 8),
+                Expanded(child: Text(_connectionStatus!, style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.w600))),
+              ],
+            ),
+          ),
         ],
-      ),
+      ],
     );
   }
 
@@ -479,69 +481,45 @@ class _ConfiguracionScreenState extends State<ConfiguracionScreen> {
     if (_isLoadingConfig) {
       return Container(
         padding: const EdgeInsets.all(24),
-        decoration: BoxDecoration(
-          color: AppTheme.cardColor,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: AppTheme.dividerColor),
-        ),
+        decoration: BoxDecoration(color: AppTheme.surfaceColor, borderRadius: BorderRadius.circular(16), border: Border.all(color: AppTheme.dividerColor)),
         child: const Center(child: CircularProgressIndicator()),
       );
     }
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: AppTheme.cardColor,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppTheme.dividerColor),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _buildCompactField(_orgController, 'Organización', Icons.business, readOnly: readOnly),
-          const SizedBox(height: 8),
-          _buildCompactField(_respController, 'Responsable', Icons.person, readOnly: readOnly),
-          const SizedBox(height: 8),
-          _buildCompactField(_telController, 'Teléfono', Icons.phone, keyboardType: TextInputType.phone, readOnly: readOnly),
-          const SizedBox(height: 8),
-          _buildCompactField(_emailController, 'Email', Icons.email, keyboardType: TextInputType.emailAddress, readOnly: readOnly),
-          const SizedBox(height: 8),
-          _buildCompactField(_cuentaController, 'N° Cuenta', Icons.account_balance, keyboardType: TextInputType.number, readOnly: readOnly),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildCompactField(_orgController, 'Organización', Icons.business_rounded, readOnly: readOnly),
+        const SizedBox(height: 8),
+        _buildCompactField(_respController, 'Responsable', Icons.person_rounded, readOnly: readOnly),
+        const SizedBox(height: 8),
+        _buildCompactField(_telController, 'Teléfono', Icons.phone_android_rounded, keyboardType: TextInputType.phone, readOnly: readOnly),
+        const SizedBox(height: 8),
+        _buildCompactField(_emailController, 'Email', Icons.email_rounded, keyboardType: TextInputType.emailAddress, readOnly: readOnly),
+        const SizedBox(height: 8),
+        _buildCompactField(_cuentaController, 'N° Cuenta', Icons.account_balance_wallet_rounded, keyboardType: TextInputType.number, readOnly: readOnly),
+        const SizedBox(height: 10),
+        Text('MÉTODO DE PAGO', style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.w800, letterSpacing: 1.2, color: AppTheme.textSecondary)),
+        const SizedBox(height: 6),
+        Row(children: [
+          _buildPagoChip('Nequi', 'nequi', readOnly: readOnly),
+          const SizedBox(width: 6),
+          _buildPagoChip('Daviplata', 'daviplata', readOnly: readOnly),
+          const SizedBox(width: 6),
+          _buildPagoChip('Bancolombia', 'bancolombia', readOnly: readOnly),
+        ]),
+        if (!readOnly) ...[
           const SizedBox(height: 10),
-          Text(
-            'MÉTODO DE PAGO',
-            style: GoogleFonts.outfit(
-              fontSize: 10, fontWeight: FontWeight.w800,
-              letterSpacing: 1.2, color: AppTheme.textSecondary,
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: _isSavingConfig ? null : _saveAppConfig,
+              icon: _isSavingConfig ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black)) : const Icon(Icons.save_rounded, size: 14),
+              label: Text(_isSavingConfig ? 'GUARDANDO...' : 'GUARDAR', style: GoogleFonts.outfit(fontWeight: FontWeight.w700, fontSize: 12)),
+              style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 10), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)), minimumSize: const Size.fromHeight(36)),
             ),
           ),
-          const SizedBox(height: 6),
-          Row(children: [
-            _buildPagoChip('Nequi', 'nequi', readOnly: readOnly),
-            const SizedBox(width: 6),
-            _buildPagoChip('Daviplata', 'daviplata', readOnly: readOnly),
-            const SizedBox(width: 6),
-            _buildPagoChip('Bancolombia', 'bancolombia', readOnly: readOnly),
-          ]),
-          if (!readOnly) ...[
-            const SizedBox(height: 10),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                onPressed: _isSavingConfig ? null : _saveAppConfig,
-                icon: _isSavingConfig
-                    ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black))
-                    : const Icon(Icons.save_rounded, size: 16),
-                label: Text(_isSavingConfig ? 'GUARDANDO...' : 'GUARDAR', style: GoogleFonts.outfit(fontWeight: FontWeight.w700, fontSize: 13)),
-                style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 10),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                  minimumSize: const Size.fromHeight(36),
-                ),
-              ),
-            ),
-          ],
         ],
-      ),
+      ],
     );
   }
 
@@ -549,11 +527,11 @@ class _ConfiguracionScreenState extends State<ConfiguracionScreen> {
     return TextField(
       controller: ctrl,
       readOnly: readOnly,
-      style: GoogleFonts.outfit(fontWeight: FontWeight.w600, fontSize: 13),
+      style: GoogleFonts.outfit(fontWeight: FontWeight.w600, fontSize: 12),
       keyboardType: keyboardType,
       decoration: InputDecoration(
         labelText: label,
-        labelStyle: GoogleFonts.outfit(fontSize: 12),
+        labelStyle: GoogleFonts.outfit(fontSize: 11),
         prefixIcon: Icon(icon, size: 18),
         contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         isDense: true,
@@ -579,12 +557,9 @@ class _ConfiguracionScreenState extends State<ConfiguracionScreen> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(
-                selected ? Icons.radio_button_checked_rounded : Icons.radio_button_unchecked_rounded,
-                size: 14, color: selected ? AppTheme.primaryColor : AppTheme.textSecondary,
-              ),
+              Icon(selected ? Icons.radio_button_checked_rounded : Icons.radio_button_unchecked_rounded, size: 14, color: selected ? AppTheme.primaryColor : AppTheme.textSecondary),
               const SizedBox(width: 4),
-              Text(label, style: GoogleFonts.outfit(fontWeight: FontWeight.w700, fontSize: 11, color: selected ? AppTheme.primaryColor : AppTheme.textSecondary)),
+              Text(label, style: GoogleFonts.outfit(fontWeight: FontWeight.w700, fontSize: 10, color: selected ? AppTheme.primaryColor : AppTheme.textSecondary)),
             ],
           ),
         ),
@@ -596,39 +571,41 @@ class _ConfiguracionScreenState extends State<ConfiguracionScreen> {
     return Consumer<ThemeProvider>(
       builder: (context, themeProvider, child) {
         return Container(
-          padding: const EdgeInsets.all(4),
+          padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: AppTheme.cardColor,
-            borderRadius: BorderRadius.circular(20),
+            color: AppTheme.surfaceColor,
+            borderRadius: BorderRadius.circular(14),
             border: Border.all(color: AppTheme.dividerColor),
           ),
-          child: ListTile(
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-            leading: AnimatedSwitcher(
-              duration: const Duration(milliseconds: 300),
-              transitionBuilder: (child, animation) =>
-                  RotationTransition(turns: animation, child: child),
-              child: Icon(
-                themeProvider.isDarkMode ? Icons.dark_mode_rounded : Icons.light_mode_rounded,
-                key: ValueKey(themeProvider.isDarkMode),
-                color: AppTheme.primaryColor,
-                size: 28,
+          child: Row(
+            children: [
+              AnimatedSwitcher(
+                duration: const Duration(milliseconds: 300),
+                transitionBuilder: (child, animation) => RotationTransition(turns: animation, child: child),
+                child: Icon(
+                  themeProvider.isDarkMode ? Icons.dark_mode_rounded : Icons.light_mode_rounded,
+                  key: ValueKey(themeProvider.isDarkMode),
+                  color: AppTheme.primaryColor,
+                  size: 26,
+                ),
               ),
-            ),
-            title: Text(
-              'Modo Oscuro',
-              style: GoogleFonts.outfit(fontWeight: FontWeight.w700),
-            ),
-            subtitle: Text(
-              themeProvider.isDarkMode ? 'Activado — Interfaz oscura' : 'Desactivado — Interfaz clara',
-              style: GoogleFonts.outfit(fontSize: 12, color: AppTheme.textSecondary),
-            ),
-            trailing: Switch.adaptive(
-              value: themeProvider.isDarkMode,
-              onChanged: (_) => themeProvider.toggleTheme(),
-              activeThumbColor: AppTheme.primaryColor,
-              activeTrackColor: AppTheme.primaryColor.withValues(alpha: 0.3),
-            ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Modo Oscuro', style: GoogleFonts.outfit(fontWeight: FontWeight.w700, fontSize: 13)),
+                    Text(themeProvider.isDarkMode ? 'Activado' : 'Desactivado', style: GoogleFonts.outfit(fontSize: 11, color: AppTheme.textSecondary)),
+                  ],
+                ),
+              ),
+              Switch.adaptive(
+                value: themeProvider.isDarkMode,
+                onChanged: (_) => themeProvider.toggleTheme(),
+                activeThumbColor: AppTheme.primaryColor,
+                activeTrackColor: AppTheme.primaryColor.withValues(alpha: 0.3),
+              ),
+            ],
           ),
         );
       },
@@ -637,41 +614,16 @@ class _ConfiguracionScreenState extends State<ConfiguracionScreen> {
 
   Widget _buildRegionInfo(BuildContext context) {
     return Container(
-      decoration: BoxDecoration(
-        color: AppTheme.cardColor,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppTheme.dividerColor),
-      ),
+      decoration: BoxDecoration(color: AppTheme.surfaceColor, borderRadius: BorderRadius.circular(14), border: Border.all(color: AppTheme.dividerColor)),
       child: Column(
         children: [
-          _buildSettingsItem(
-            icon: Icons.flag_rounded,
-            iconColor: Colors.red.shade400,
-            title: 'País',
-            subtitle: 'Colombia 🇨🇴',
-          ),
-          const Divider(height: 1, indent: 72),
-          _buildSettingsItem(
-            icon: Icons.attach_money_rounded,
-            iconColor: Colors.green.shade400,
-            title: 'Moneda',
-            subtitle: 'Peso Colombiano (COP)',
-          ),
-          const Divider(height: 1, indent: 72),
-          _buildSettingsItem(
-            icon: Icons.schedule_rounded,
-            iconColor: Colors.blue.shade400,
-            title: 'Zona Horaria',
-            subtitle: 'Bogotá (UTC-5)',
-          ),
-          const Divider(height: 1, indent: 72),
-          _buildSettingsItem(
-            icon: Icons.phone_rounded,
-            iconColor: Colors.purple.shade400,
-            title: 'Código de País',
-            subtitle: '+57',
-            isLast: true,
-          ),
+          _buildSettingsItem(icon: Icons.flag_rounded, iconColor: Colors.red.shade400, title: 'País', subtitle: 'Colombia'),
+          const Divider(height: 1, indent: 56),
+          _buildSettingsItem(icon: Icons.attach_money_rounded, iconColor: Colors.green.shade400, title: 'Moneda', subtitle: 'Peso Colombiano (COP)'),
+          const Divider(height: 1, indent: 56),
+          _buildSettingsItem(icon: Icons.schedule_rounded, iconColor: Colors.blue.shade400, title: 'Zona Horaria', subtitle: 'Bogotá (UTC-5)'),
+          const Divider(height: 1, indent: 56),
+          _buildSettingsItem(icon: Icons.phone_rounded, iconColor: Colors.purple.shade400, title: 'Código de País', subtitle: '+57', isLast: true),
         ],
       ),
     );
@@ -679,40 +631,20 @@ class _ConfiguracionScreenState extends State<ConfiguracionScreen> {
 
   Widget _buildAboutSection(BuildContext context) {
     final isConnected = !FirebaseService.instance.useLocalData;
-    
     return Container(
-      decoration: BoxDecoration(
-        color: AppTheme.cardColor,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppTheme.dividerColor),
-      ),
+      decoration: BoxDecoration(color: AppTheme.surfaceColor, borderRadius: BorderRadius.circular(14), border: Border.all(color: AppTheme.dividerColor)),
       child: Column(
         children: [
-          _buildSettingsItem(
-            icon: Icons.flutter_dash_rounded,
-            iconColor: Colors.cyan.shade400,
-            title: 'Desarrollado con',
-            subtitle: 'Flutter & Firebase',
-          ),
-          const Divider(height: 1, indent: 72),
+          _buildSettingsItem(icon: Icons.flutter_dash_rounded, iconColor: Colors.cyan.shade400, title: 'Desarrollado con', subtitle: 'Flutter & Firebase'),
+          const Divider(height: 1, indent: 56),
           _buildSettingsItem(
             icon: isConnected ? Icons.cloud_done_rounded : Icons.cloud_off_rounded,
             iconColor: isConnected ? Colors.green.shade400 : Colors.orange.shade400,
             title: 'Estado de Firebase',
-            subtitle: isConnected ? 'Conectado — Sincronización activa' : 'Modo local — Sin conexión',
+            subtitle: isConnected ? 'Conectado' : 'Modo local',
             trailing: Container(
-              width: 10,
-              height: 10,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: isConnected ? Colors.green : Colors.orange,
-                boxShadow: [
-                  BoxShadow(
-                    color: (isConnected ? Colors.green : Colors.orange).withValues(alpha: 0.4),
-                    blurRadius: 6,
-                  ),
-                ],
-              ),
+              width: 8, height: 8,
+              decoration: BoxDecoration(shape: BoxShape.circle, color: isConnected ? Colors.green : Colors.orange, boxShadow: [BoxShadow(color: (isConnected ? Colors.green : Colors.orange).withValues(alpha: 0.4), blurRadius: 6)]),
             ),
             isLast: true,
           ),
@@ -721,49 +653,19 @@ class _ConfiguracionScreenState extends State<ConfiguracionScreen> {
     );
   }
 
-  Widget _buildSettingsItem({
-    required IconData icon,
-    required Color iconColor,
-    required String title,
-    required String subtitle,
-    Widget? trailing,
-    bool isLast = false,
-  }) {
+  Widget _buildSettingsItem({required IconData icon, required Color iconColor, required String title, required String subtitle, Widget? trailing, bool isLast = false}) {
     return Padding(
-      padding: EdgeInsets.only(
-        left: 16, right: 16,
-        top: 14, bottom: isLast ? 14 : 14,
-      ),
+      padding: EdgeInsets.only(left: 14, right: 14, top: 12, bottom: isLast ? 12 : 12),
       child: Row(
         children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: iconColor.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(icon, color: iconColor, size: 22),
-          ),
-          const SizedBox(width: 16),
+          Icon(icon, color: iconColor, size: 20),
+          const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  title,
-                  style: GoogleFonts.outfit(
-                    fontWeight: FontWeight.w700,
-                    fontSize: 14,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  subtitle,
-                  style: GoogleFonts.outfit(
-                    fontSize: 12,
-                    color: AppTheme.textSecondary,
-                  ),
-                ),
+                Text(title, style: GoogleFonts.outfit(fontWeight: FontWeight.w700, fontSize: 13)),
+                Text(subtitle, style: GoogleFonts.outfit(fontSize: 11, color: AppTheme.textSecondary)),
               ],
             ),
           ),
@@ -775,48 +677,28 @@ class _ConfiguracionScreenState extends State<ConfiguracionScreen> {
 
   Widget _buildAccountSection(BuildContext context) {
     return Container(
-      decoration: BoxDecoration(
-        color: AppTheme.cardColor,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppTheme.dividerColor),
-      ),
+      decoration: BoxDecoration(color: AppTheme.surfaceColor, borderRadius: BorderRadius.circular(14), border: Border.all(color: AppTheme.errorColor.withValues(alpha: 0.2))),
       child: Material(
         color: Colors.transparent,
         child: InkWell(
           onTap: () => _showLogoutDialog(context),
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(14),
           child: Padding(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(14),
             child: Row(
               children: [
                 Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: AppTheme.errorColor.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Icon(Icons.logout_rounded, color: AppTheme.errorColor, size: 22),
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(color: AppTheme.errorColor.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(10)),
+                  child: Icon(Icons.logout_rounded, color: AppTheme.errorColor, size: 20),
                 ),
-                const SizedBox(width: 16),
+                const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        'Cerrar Sesión',
-                        style: GoogleFonts.outfit(
-                          fontWeight: FontWeight.w700,
-                          fontSize: 14,
-                          color: AppTheme.errorColor,
-                        ),
-                      ),
-                      Text(
-                        'Salir del panel administrativo',
-                        style: GoogleFonts.outfit(
-                          fontSize: 12,
-                          color: AppTheme.textSecondary,
-                        ),
-                      ),
+                      Text('Cerrar Sesión', style: GoogleFonts.outfit(fontWeight: FontWeight.w700, fontSize: 13, color: AppTheme.errorColor)),
+                      Text('Salir del panel', style: GoogleFonts.outfit(fontSize: 11, color: AppTheme.textSecondary)),
                     ],
                   ),
                 ),
