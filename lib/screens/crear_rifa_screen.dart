@@ -8,6 +8,8 @@ import 'package:http/http.dart' as http;
 import '../config/theme.dart';
 import '../config/constants.dart';
 import '../models/rifa.dart';
+import '../models/user.dart';
+import '../providers/auth_provider.dart';
 import '../providers/rifa_provider.dart';
 
 class CrearRifaScreen extends StatefulWidget {
@@ -35,11 +37,29 @@ class _CrearRifaScreenState extends State<CrearRifaScreen> {
   DateTime? _fechaSorteo;
   final List<String> _imagenes = [];
   final ImagePicker _picker = ImagePicker();
+  List<UserModel> _vendedores = [];
+  final List<String> _selectedVendedores = [];
+  bool _loadingVendedores = false;
 
   @override
   void initState() {
     super.initState();
     _precioController.addListener(_onPrecioChanged);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadVendedores());
+  }
+
+  Future<void> _loadVendedores() async {
+    final auth = context.read<AuthProvider>();
+    final orgId = auth.organizacionId;
+    if (orgId == null) return;
+    setState(() => _loadingVendedores = true);
+    try {
+      final users = await auth.getUsersInOrg(orgId);
+      setState(() {
+        _vendedores = users.where((u) => u.rol == UserRol.vendedor && u.activo).toList();
+      });
+    } catch (_) {}
+    setState(() => _loadingVendedores = false);
   }
 
   void _onPrecioChanged() {
@@ -161,6 +181,8 @@ class _CrearRifaScreenState extends State<CrearRifaScreen> {
               ],
             ),
             
+            const SizedBox(height: 24),
+            _buildVendedoresSection(),
             const SizedBox(height: 24),
             _buildPreview(),
             const SizedBox(height: 32),
@@ -867,6 +889,43 @@ class _CrearRifaScreenState extends State<CrearRifaScreen> {
     );
   }
 
+  Widget _buildVendedoresSection() {
+    return _buildSectionCard(
+      title: 'Asignar Vendedores',
+      icon: Icons.people_outline,
+      children: [
+        if (_loadingVendedores)
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 8),
+            child: Center(child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))),
+          )
+        else if (_vendedores.isEmpty)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            child: Text('No hay vendedores activos en tu organización', style: TextStyle(fontSize: 12, color: AppTheme.textSecondary)),
+          )
+        else
+          ..._vendedores.map((v) => CheckboxListTile(
+            dense: true,
+            visualDensity: VisualDensity.compact,
+            contentPadding: EdgeInsets.zero,
+            title: Text(v.nombre, style: const TextStyle(fontSize: 13)),
+            subtitle: Text(v.email, style: TextStyle(fontSize: 10, color: AppTheme.textSecondary)),
+            value: _selectedVendedores.contains(v.uid),
+            onChanged: (checked) {
+              setState(() {
+                if (checked == true) {
+                  _selectedVendedores.add(v.uid);
+                } else {
+                  _selectedVendedores.remove(v.uid);
+                }
+              });
+            },
+          )),
+      ],
+    );
+  }
+
   Widget _buildPreview() {
     final precio = double.tryParse(_precioController.text) ?? 0;
     final ingresosPosibles = _cantidadNumeros * precio;
@@ -1000,6 +1059,7 @@ class _CrearRifaScreenState extends State<CrearRifaScreen> {
         organizacion: _organizacionController.text.trim().isEmpty ? null : _organizacionController.text.trim(),
         responsable: _responsableController.text.trim().isEmpty ? null : _responsableController.text.trim(),
         contactoResponsable: _contactoController.text.trim().isEmpty ? null : _contactoController.text.trim(),
+        vendedoresAsignados: _selectedVendedores,
       );
 
       await provider.crearRifa(rifa);

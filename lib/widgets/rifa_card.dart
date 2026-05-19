@@ -510,6 +510,13 @@ class _RifaCardState extends State<RifaCard> with SingleTickerProviderStateMixin
               text: '${widget.rifa.cantidadNumeros} números',
             ),
 
+            if (widget.rifa.vendedoresAsignados.isNotEmpty)
+              _buildTag(
+                icon: Icons.people_alt_outlined,
+                text: widget.rifa.vendedoresAsignados.length == 1
+                    ? '1 vendedor'
+                    : '${widget.rifa.vendedoresAsignados.length} vendedores',
+              ),
           ],
         ),
       ],
