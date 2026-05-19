@@ -9,8 +9,6 @@ import '../services/firebase_service.dart';
 import '../services/report_service.dart';
 import '../widgets/edit_rifa_dialog.dart';
 import 'sales_list_screen.dart';
-import '../widgets/logout_helper.dart';
-import 'admin_users_screen.dart';
 
 class AdminScreen extends StatefulWidget {
   const AdminScreen({super.key});
@@ -31,53 +29,6 @@ class _AdminScreenState extends State<AdminScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Row(
-          children: [
-            Container(
-              decoration: BoxDecoration(
-                boxShadow: [
-                  BoxShadow(
-                    color: AppTheme.primaryColor.withValues(alpha: 0.2),
-                    blurRadius: 10,
-                    spreadRadius: 2,
-                  ),
-                ],
-              ),
-              child: Image.asset(
-                'assets/logo/logo.png',
-                height: 48,
-                fit: BoxFit.contain,
-              ),
-            ),
-            const SizedBox(width: 12),
-            const Expanded(
-              child: Text(
-                'Panel de Administración',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: AppTheme.primaryColor,
-                ),
-                maxLines: 1,
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.people_alt_rounded),
-            tooltip: 'Gestionar Usuarios',
-            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AdminUsersScreen())),
-          ),
-          const SizedBox(width: 4),
-          IconButton(
-            icon: const Icon(Icons.logout),
-            tooltip: 'Cerrar Sesión',
-            onPressed: () => _showLogoutDialog(context),
-          ),
-        ],
-      ),
       body: Consumer<RifaProvider>(
         builder: (context, provider, child) {
           if (provider.rifas.isEmpty) {
@@ -85,15 +36,28 @@ class _AdminScreenState extends State<AdminScreen> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(
-                    Icons.admin_panel_settings,
-                    size: 80,
-                    color: AppTheme.textSecondary.withValues(alpha: 0.5),
+                  Container(
+                    padding: const EdgeInsets.all(24),
+                    decoration: BoxDecoration(
+                      color: AppTheme.surfaceColor,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: AppTheme.dividerColor),
+                    ),
+                    child: Icon(
+                      Icons.admin_panel_settings_rounded,
+                      size: 64,
+                      color: AppTheme.textSecondary.withValues(alpha: 0.5),
+                    ),
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 24),
                   Text(
                     'No hay rifas para administrar',
                     style: Theme.of(context).textTheme.titleLarge,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Crea una rifa desde la pantalla de Inicio',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: AppTheme.textSecondary),
                   ),
                 ],
               ),
@@ -102,6 +66,7 @@ class _AdminScreenState extends State<AdminScreen> {
 
           return RefreshIndicator(
             onRefresh: () => provider.loadRifas(),
+            color: AppTheme.primaryColor,
             child: ListView.builder(
               padding: const EdgeInsets.all(16),
               itemCount: provider.rifas.length,
@@ -131,49 +96,85 @@ class _AdminScreenState extends State<AdminScreen> {
   }
 
   Widget _buildAdminRifaCardContent(BuildContext context, Rifa rifa, RifaProvider provider, Map<String, dynamic> stats) {
-    return _HoverCard(
+    final int vendidos = stats['totalVendidos'] as int? ?? 0;
+    final progreso = rifa.cantidadNumeros > 0 ? vendidos / rifa.cantidadNumeros : 0.0;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: AppTheme.cardColor,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppTheme.dividerColor),
+      ),
       child: ExpansionTile(
-        tilePadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
-        childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+        tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+        childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
         shape: const RoundedRectangleBorder(side: BorderSide.none),
         collapsedShape: const RoundedRectangleBorder(side: BorderSide.none),
         leading: Container(
           padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
             color: (rifa.activa ? AppTheme.secondaryColor : AppTheme.errorColor).withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: BorderRadius.circular(10),
           ),
           child: Icon(
-            rifa.activa ? Icons.check_circle : Icons.cancel,
+            rifa.activa ? Icons.check_circle_rounded : Icons.cancel_rounded,
             color: rifa.activa ? AppTheme.secondaryColor : AppTheme.errorColor,
-            size: 20,
+            size: 22,
           ),
         ),
         title: Text(
           rifa.nombre,
-          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
         ),
-        subtitle: Text(
-          '${rifa.cantidadNumeros} números • ${AppConstants.formatCurrencyCOP(rifa.precioNumero)}',
-          style: const TextStyle(fontSize: 11),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const SizedBox(height: 4),
+            Text(
+              '${rifa.cantidadNumeros} números • ${AppConstants.formatCurrencyCOP(rifa.precioNumero)}',
+              style: const TextStyle(fontSize: 11),
+            ),
+            const SizedBox(height: 8),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(4),
+              child: LinearProgressIndicator(
+                value: progreso,
+                minHeight: 6,
+                backgroundColor: AppTheme.dividerColor,
+                valueColor: AlwaysStoppedAnimation<Color>(
+                  progreso > 0.8 ? AppTheme.secondaryColor : AppTheme.primaryColor,
+                ),
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              '${(progreso * 100).toInt()}% vendido ($vendidos/${rifa.cantidadNumeros})',
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w700,
+                color: progreso > 0.8 ? AppTheme.secondaryColor : AppTheme.textSecondary,
+              ),
+            ),
+          ],
         ),
         children: [
           _buildStatsSection(stats, rifa),
-          const Divider(color: AppTheme.dividerColor, height: 16),
+          const Divider(color: AppTheme.dividerColor, height: 24),
           _buildActionsSection(context, rifa, provider),
         ],
       ),
     );
   }
 
-Widget _buildStatsSection(Map<String, dynamic> stats, Rifa rifa) {
+  Widget _buildStatsSection(Map<String, dynamic> stats, Rifa rifa) {
     final int vendidos = stats['totalVendidos'] as int? ?? 0;
     final int disponibles = rifa.cantidadNumeros - vendidos;
     final int numerosPagados = stats['numerosPagados'] as int? ?? 0;
     final int numerosReservados = stats['numerosReservados'] as int? ?? 0;
     final double pagadosValor = numerosPagados * rifa.precioNumero;
     final double reservadosValor = numerosReservados * rifa.precioNumero;
-    
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -186,34 +187,17 @@ Widget _buildStatsSection(Map<String, dynamic> stats, Rifa rifa) {
         const SizedBox(height: 12),
         Row(
           children: [
-            Expanded(
-              child: _buildStatItem('Vendidos', '$vendidos', Icons.sell, AppTheme.primaryColor),
-            ),
-            Expanded(
-              child: _buildStatItem('Disponibles', '$disponibles', Icons.inventory_2, AppTheme.secondaryColor),
-            ),
+            Expanded(child: _buildStatItem('Vendidos', '$vendidos', Icons.sell_rounded, AppTheme.primaryColor)),
+            const SizedBox(width: 8),
+            Expanded(child: _buildStatItem('Disponibles', '$disponibles', Icons.inventory_2_rounded, AppTheme.secondaryColor)),
           ],
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 8),
         Row(
           children: [
-            Expanded(
-              child: _buildStatItem('Pagados', AppConstants.formatCurrencyCOP(pagadosValor), Icons.payments, Colors.green),
-            ),
-            Expanded(
-              child: _buildStatItem('Pendiente', AppConstants.formatCurrencyCOP(reservadosValor), Icons.pending, Colors.orange),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        Row(
-          children: [
-            Expanded(
-              child: _buildStatItem('Números Pagados', '${stats['numerosPagados'] ?? 0}', Icons.people, Colors.blue),
-            ),
-            Expanded(
-              child: _buildStatItem('Números Reservados', '${stats['numerosReservados'] ?? 0}', Icons.people_outline, Colors.orange),
-            ),
+            Expanded(child: _buildStatItem('Pagados', AppConstants.formatCurrencyCOP(pagadosValor), Icons.payments_rounded, Colors.green)),
+            const SizedBox(width: 8),
+            Expanded(child: _buildStatItem('Pendiente', AppConstants.formatCurrencyCOP(reservadosValor), Icons.pending_rounded, Colors.orange)),
           ],
         ),
       ],
@@ -222,100 +206,149 @@ Widget _buildStatsSection(Map<String, dynamic> stats, Rifa rifa) {
 
   Widget _buildStatItem(String label, String value, IconData icon, Color color) {
     return Container(
-      padding: const EdgeInsets.all(12),
-      margin: const EdgeInsets.all(4),
+      padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
+        color: color.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withValues(alpha: 0.15)),
       ),
-      child: Column(
+      child: Row(
         children: [
-          Icon(icon, color: color, size: 24),
-          const SizedBox(height: 4),
-          Text(
-            value,
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              color: color,
+          Icon(icon, color: color, size: 18),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    value,
+                    style: TextStyle(fontWeight: FontWeight.bold, color: color, fontSize: 13),
+                  ),
+                ),
+                Text(
+                  label,
+                  style: TextStyle(fontSize: 10, color: AppTheme.textSecondary),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
             ),
-          ),
-          Text(
-            label,
-            style: const TextStyle(fontSize: 12),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildActionsSection(BuildContext context, rifa, RifaProvider provider) {
+  Widget _buildActionsSection(BuildContext context, Rifa rifa, RifaProvider provider) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        GridView.count(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          crossAxisCount: 3,
-          mainAxisSpacing: 4,
-          crossAxisSpacing: 6,
-          childAspectRatio: 1.0,
-          children: [
-            _buildCircularAction(
-              icon: Icons.edit_rounded,
-              label: 'Editar',
-              color: Colors.blue,
-              onTap: () => _showEditDialog(context, rifa, provider),
-            ),
-            _buildCircularAction(
-              icon: rifa.activa ? Icons.pause_rounded : Icons.play_arrow_rounded,
-              label: rifa.activa ? 'Cerrar' : 'Activar',
-              color: rifa.activa ? Colors.orange : AppTheme.secondaryColor,
-              onTap: () => _toggleRifaStatus(context, rifa, provider),
-            ),
-            _buildCircularAction(
-              icon: Icons.people_alt_rounded,
-              label: 'Ventas',
-              color: Colors.teal,
-              onTap: () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => SalesListScreen(rifa: rifa)),
-              ),
-            ),
-            _buildCircularAction(
-              icon: Icons.emoji_events_rounded,
-              label: 'Ganador',
-              color: Colors.amber,
-              onTap: () => _showSetWinnerDialog(context, rifa, provider),
-            ),
-            _buildCircularAction(
-              icon: Icons.file_download_rounded,
-              label: 'Exportar',
-              color: AppTheme.primaryColor,
-              onTap: () => _exportData(context, rifa, provider),
-            ),
-            _buildCircularAction(
-              icon: Icons.delete_forever_rounded,
-              label: 'Eliminar',
-              color: AppTheme.errorColor,
-              onTap: () => _confirmDeleteRifa(context, rifa, provider),
-            ),
-          ],
+        Text(
+          'Acciones',
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+        ),
+        const SizedBox(height: 8),
+        _buildActionTile(
+          icon: Icons.edit_rounded,
+          label: 'Editar Rifa',
+          subtitle: 'Modificar nombre, precio, descripción',
+          color: Colors.blue,
+          onTap: () => _showEditDialog(context, rifa, provider),
+        ),
+        _buildActionTile(
+          icon: rifa.activa ? Icons.pause_circle_rounded : Icons.play_circle_rounded,
+          label: rifa.activa ? 'Cerrar Rifa' : 'Activar Rifa',
+          subtitle: rifa.activa ? 'Desactivar ventas temporalmente' : 'Habilitar ventas',
+          color: rifa.activa ? Colors.orange : AppTheme.secondaryColor,
+          onTap: () => _toggleRifaStatus(context, rifa, provider),
+        ),
+        _buildActionTile(
+          icon: Icons.receipt_long_rounded,
+          label: 'Ver Ventas',
+          subtitle: 'Lista completa de participantes',
+          color: Colors.teal,
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => SalesListScreen(rifa: rifa)),
+          ),
+        ),
+        _buildActionTile(
+          icon: Icons.emoji_events_rounded,
+          label: 'Establecer Ganador',
+          subtitle: 'Definir el número ganador del sorteo',
+          color: Colors.amber,
+          onTap: () => _showSetWinnerDialog(context, rifa, provider),
+        ),
+        _buildActionTile(
+          icon: Icons.download_for_offline_rounded,
+          label: 'Exportar Datos',
+          subtitle: 'Descargar reporte CSV o PDF',
+          color: AppTheme.primaryColor,
+          onTap: () => _exportData(context, rifa, provider),
+        ),
+        _buildActionTile(
+          icon: Icons.delete_forever_rounded,
+          label: 'Eliminar Rifa',
+          subtitle: 'Acción irreversible',
+          color: AppTheme.errorColor,
+          onTap: () => _confirmDeleteRifa(context, rifa, provider),
         ),
       ],
     );
   }
 
-  Widget _buildCircularAction({
+  Widget _buildActionTile({
     required IconData icon,
     required String label,
+    required String subtitle,
     required Color color,
     required VoidCallback onTap,
   }) {
-    return _HoverIcon(
-      icon: icon,
-      label: label,
-      color: color,
-      onTap: onTap,
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(icon, color: color, size: 20),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      label,
+                      style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 13,
+                        color: color,
+                      ),
+                    ),
+                    Text(
+                      subtitle,
+                      style: TextStyle(fontSize: 10, color: AppTheme.textSecondary),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(Icons.chevron_right_rounded, color: color.withValues(alpha: 0.5), size: 20),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
@@ -326,12 +359,13 @@ Widget _buildStatsSection(Map<String, dynamic> stats, Rifa rifa) {
     );
   }
 
-
   void _toggleRifaStatus(BuildContext context, Rifa rifa, RifaProvider provider) {
     final newStatus = !rifa.activa;
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        backgroundColor: AppTheme.cardColor,
         title: Text(newStatus ? 'Activar Rifa' : 'Cerrar Rifa'),
         content: Text(newStatus
             ? '¿Estás seguro de activar "${rifa.nombre}"?'
@@ -341,12 +375,13 @@ Widget _buildStatsSection(Map<String, dynamic> stats, Rifa rifa) {
           ElevatedButton(
             style: ElevatedButton.styleFrom(
               backgroundColor: newStatus ? AppTheme.secondaryColor : Colors.orange,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             ),
             onPressed: () {
               provider.actualizarRifa(rifa.copyWith(activa: newStatus));
               Navigator.pop(ctx);
               ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text(newStatus ? 'Rifa activada' : 'Rifa cerrada')),
+                SnackBar(content: Text(newStatus ? '✅ Rifa activada' : '⏸️ Rifa cerrada')),
               );
             },
             child: Text(newStatus ? 'ACTIVAR' : 'CERRAR'),
@@ -356,10 +391,12 @@ Widget _buildStatsSection(Map<String, dynamic> stats, Rifa rifa) {
     );
   }
 
-  void _confirmDeleteRifa(BuildContext context, rifa, RifaProvider provider) {
+  void _confirmDeleteRifa(BuildContext context, Rifa rifa, RifaProvider provider) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        backgroundColor: AppTheme.cardColor,
         title: const Text('Eliminar Rifa'),
         content: Text('¿Está seguro de eliminar "${rifa.nombre}"? Esta acción no se puede deshacer.'),
         actions: [
@@ -368,12 +405,15 @@ Widget _buildStatsSection(Map<String, dynamic> stats, Rifa rifa) {
             child: const Text('Cancelar'),
           ),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.errorColor),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.errorColor,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
             onPressed: () {
               provider.eliminarRifa(rifa.id);
               Navigator.pop(context);
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Rifa eliminada')),
+                const SnackBar(content: Text('🗑️ Rifa eliminada')),
               );
             },
             child: const Text('Eliminar'),
@@ -387,15 +427,17 @@ Widget _buildStatsSection(Map<String, dynamic> stats, Rifa rifa) {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        backgroundColor: AppTheme.cardColor,
         title: const Text('Exportar Reporte'),
         content: const Text('Selecciona el formato:'),
         actions: [
           TextButton.icon(
             onPressed: () { Navigator.pop(ctx); provider.exportarDatosCSV(rifaId: rifa.id, nombreRifa: rifa.nombre); },
-            icon: const Icon(Icons.table_chart_outlined, size: 18),
-            label: const Text('CSV (Excel)'),
+            icon: const Icon(Icons.table_chart_rounded, size: 18),
+            label: const Text('CSV'),
           ),
-            ElevatedButton.icon(
+          ElevatedButton.icon(
             onPressed: () async {
               Navigator.pop(ctx);
               final auth = context.read<AuthProvider>();
@@ -424,24 +466,39 @@ Widget _buildStatsSection(Map<String, dynamic> stats, Rifa rifa) {
                 }
               }
             },
-            icon: const Icon(Icons.picture_as_pdf, size: 18),
+            icon: const Icon(Icons.picture_as_pdf_rounded, size: 18),
             label: const Text('PDF'),
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red.shade700),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red.shade700,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
           ),
         ],
       ),
     );
   }
 
-  void _showLogoutDialog(BuildContext context) {
-    showLogoutDialog(context);
-  }
   void _showSetWinnerDialog(BuildContext context, Rifa rifa, RifaProvider provider) {
     final controller = TextEditingController();
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Establecer Ganador'),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        backgroundColor: AppTheme.cardColor,
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.amber.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Icon(Icons.emoji_events_rounded, color: Colors.amber, size: 22),
+            ),
+            const SizedBox(width: 12),
+            const Text('Establecer Ganador'),
+          ],
+        ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -453,150 +510,51 @@ Widget _buildStatsSection(Map<String, dynamic> stats, Rifa rifa) {
               decoration: InputDecoration(
                 hintText: rifa.tipoRifa == '3 cifras' ? '000' : '00',
                 labelText: 'Número Ganador',
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
               ),
               maxLength: rifa.tipoRifa == '3 cifras' ? 3 : 2,
             ),
             const SizedBox(height: 8),
-            const Text(
-              'Al establecer un ganador, la rifa se marcará como CERRADA automáticamente.',
-              style: TextStyle(fontSize: 12, color: Colors.amber, fontStyle: FontStyle.italic),
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: Colors.amber.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: Colors.amber.withValues(alpha: 0.2)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.info_outline_rounded, color: Colors.amber, size: 18),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Al establecer un ganador, la rifa se marcará como CERRADA automáticamente.',
+                      style: TextStyle(fontSize: 11, color: Colors.amber.shade700),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ],
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context), child: const Text('CANCELAR')),
           ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.amber,
+              foregroundColor: AppTheme.backgroundColor,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
             onPressed: () {
               if (controller.text.isNotEmpty) {
                 provider.setNumeroGanador(rifa.id, controller.text);
                 Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('🏆 Ganador establecido'), backgroundColor: Colors.amber),
+                );
               }
             },
             child: const Text('GUARDAR'),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// --- WIDGETS AUXILIARES PARA EL EFECTO HOVER ---
-
-class _HoverCard extends StatefulWidget {
-  final Widget child;
-  const _HoverCard({required this.child});
-
-  @override
-  State<_HoverCard> createState() => _HoverCardState();
-}
-
-class _HoverCardState extends State<_HoverCard> {
-  bool _isHovered = false;
-
-  @override
-  Widget build(BuildContext context) {
-    return MouseRegion(
-      onEnter: (_) => setState(() => _isHovered = true),
-      onExit: (_) => setState(() => _isHovered = false),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        margin: const EdgeInsets.only(bottom: 2),
-        decoration: BoxDecoration(
-          color: _isHovered 
-              ? AppTheme.surfaceColor.withValues(alpha: 1.0) 
-              : AppTheme.surfaceColor.withValues(alpha: 0.8),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: _isHovered ? AppTheme.primaryColor.withValues(alpha: 0.5) : AppTheme.dividerColor.withValues(alpha: 0.5),
-            width: _isHovered ? 1.5 : 1.0,
-          ),
-          boxShadow: _isHovered ? [
-            BoxShadow(
-              color: AppTheme.primaryColor.withValues(alpha: 0.1),
-              blurRadius: 8,
-              spreadRadius: 1,
-            )
-          ] : [],
-        ),
-        child: widget.child,
-      ),
-    );
-  }
-}
-
-class _HoverIcon extends StatefulWidget {
-  final IconData icon;
-  final String label;
-  final Color color;
-  final VoidCallback onTap;
-
-  const _HoverIcon({
-    required this.icon,
-    required this.label,
-    required this.color,
-    required this.onTap,
-  });
-
-  @override
-  State<_HoverIcon> createState() => _HoverIconState();
-}
-
-class _HoverIconState extends State<_HoverIcon> {
-  bool _isHovered = false;
-
-  @override
-  Widget build(BuildContext context) {
-    return MouseRegion(
-      onEnter: (_) => setState(() => _isHovered = true),
-      onExit: (_) => setState(() => _isHovered = false),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Material(
-            color: Colors.transparent,
-            child: InkWell(
-              onTap: widget.onTap,
-              customBorder: const CircleBorder(),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                width: 44,
-                height: 44,
-                transform: _isHovered ? (Matrix4.identity()..scale(1.1)) : Matrix4.identity(),
-                transformAlignment: Alignment.center,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: _isHovered ? [
-                      widget.color,
-                      widget.color.withValues(alpha: 0.7),
-                    ] : [
-                      widget.color.withValues(alpha: 0.8),
-                      widget.color,
-                    ],
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: widget.color.withValues(alpha: _isHovered ? 0.4 : 0.2),
-                      blurRadius: _isHovered ? 8 : 4,
-                      offset: Offset(0, _isHovered ? 4 : 2),
-                    ),
-                  ],
-                ),
-                child: Icon(widget.icon, color: Colors.white, size: 22),
-              ),
-            ),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            widget.label,
-            style: TextStyle(
-              color: _isHovered ? AppTheme.primaryColor : AppTheme.textPrimary,
-              fontSize: 9,
-              fontWeight: FontWeight.w700,
-            ),
-            textAlign: TextAlign.center,
           ),
         ],
       ),

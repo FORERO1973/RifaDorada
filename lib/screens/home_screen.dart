@@ -1,10 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../config/theme.dart';
-import '../config/constants.dart';
 import '../providers/rifa_provider.dart';
 import '../providers/auth_provider.dart';
 import '../widgets/rifa_card.dart';
@@ -13,6 +11,8 @@ import '../widgets/shimmer_loading.dart';
 import '../models/rifa.dart';
 import 'crear_rifa_screen.dart';
 import 'selector_numeros_screen.dart';
+import 'imagen_estado_screen.dart';
+import 'sales_list_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -61,121 +61,196 @@ class _HomeScreenState extends State<HomeScreen>
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<RifaProvider>();
+    final auth = context.watch<AuthProvider>();
     return Scaffold(
       body: SafeArea(
         child: RefreshIndicator(
-            onRefresh: () => context.read<RifaProvider>().loadRifas(),
-            child: CustomScrollView(
-          slivers: [
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    SlideTransition(
-                      position: _headerSlide,
-                      child: FadeTransition(
-                        opacity: _headerFade,
-                        child: _buildHeader(),
+          onRefresh: () => context.read<RifaProvider>().loadRifas(),
+          color: AppTheme.primaryColor,
+          child: CustomScrollView(
+            slivers: [
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      SlideTransition(
+                        position: _headerSlide,
+                        child: FadeTransition(
+                          opacity: _headerFade,
+                          child: _buildHeader(auth),
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 24),
-                    _buildWinnersSection(context, provider),
-                    const SizedBox(height: 24),
-                    _buildQuickStats(),
-                    const SizedBox(height: 24),
-                    _buildActiveRifasTitle(),
-                  ],
+                      const SizedBox(height: 24),
+                      _buildWinnersSection(context, provider),
+                      const SizedBox(height: 24),
+                      _buildQuickStats(),
+                      const SizedBox(height: 24),
+                      _buildQuickActions(context, provider),
+                      const SizedBox(height: 24),
+                      _buildActiveRifasTitle(),
+                    ],
+                  ),
                 ),
               ),
-            ),
-            _buildRifasList(),
-          ],
-        ),
+              _buildRifasList(),
+            ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildHeader() {
-    return SizedBox(
-      width: double.infinity,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          Stack(
-            alignment: Alignment.center,
-            children: [
-              // Glowing aura
-              Container(
-                width: 120,
-                height: 120,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  boxShadow: [
-                    BoxShadow(
-                      color: AppTheme.primaryColor.withValues(alpha: 0.15),
-                      blurRadius: 30,
-                      spreadRadius: 10,
-                    ),
-                  ],
+  Widget _buildHeader(AuthProvider auth) {
+    final user = auth.currentUser;
+    final hour = DateTime.now().hour;
+    final saludo = hour < 12 ? 'Buenos días' : hour < 18 ? 'Buenas tardes' : 'Buenas noches';
+    final userName = user?.nombre.isNotEmpty == true ? user!.nombre : 'Administrador';
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(2),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: AppTheme.goldGradient,
+              ),
+              child: CircleAvatar(
+                radius: 28,
+                backgroundColor: AppTheme.surfaceColor,
+                child: Text(
+                  userName.isNotEmpty ? userName[0].toUpperCase() : 'A',
+                  style: GoogleFonts.outfit(
+                    fontSize: 24,
+                    fontWeight: FontWeight.w900,
+                    color: AppTheme.primaryColor,
+                  ),
                 ),
               ),
-              // Logo Image
-              Image.asset(
-                'assets/logo/logo.png',
-                height: 150,
-                fit: BoxFit.contain,
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          ShaderMask(
-            shaderCallback: (bounds) => const LinearGradient(
-              colors: [AppTheme.accentGold, AppTheme.primaryColor, AppTheme.primaryDark],
-            ).createShader(bounds),
-            child: Text(
-              'RifaDorada',
-              style: Theme.of(context).textTheme.displayMedium?.copyWith(
-                color: Colors.white,
-                fontWeight: FontWeight.w900,
-                letterSpacing: -1,
-              ),
-              textAlign: TextAlign.center,
             ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            'BIENVENIDO AL PANEL PRINCIPAL',
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              letterSpacing: 2,
-              fontWeight: FontWeight.w800,
-              color: AppTheme.textSecondary.withValues(alpha: 0.7),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '$saludo,',
+                    style: GoogleFonts.outfit(
+                      fontSize: 13,
+                      color: AppTheme.textSecondary,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    userName,
+                    style: GoogleFonts.outfit(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w900,
+                      color: AppTheme.textPrimary,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
             ),
-            textAlign: TextAlign.center,
+            Container(
+              height: 50,
+              width: 50,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: AppTheme.primaryColor.withValues(alpha: 0.2),
+                    blurRadius: 15,
+                    spreadRadius: 2,
+                  ),
+                ],
+              ),
+              child: Image.asset('assets/logo/logo.png', fit: BoxFit.contain),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        Text(
+          'RIFADORADA',
+          style: GoogleFonts.outfit(
+            fontSize: 11,
+            fontWeight: FontWeight.w800,
+            letterSpacing: 3,
+            color: AppTheme.textSecondary.withValues(alpha: 0.5),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
   Widget _buildWinnersSection(BuildContext context, RifaProvider provider) {
     final rifasConGanador = provider.rifas.where((r) => r.numeroGanador != null).toList();
 
-    if (rifasConGanador.isEmpty) return const SizedBox.shrink();
+    if (rifasConGanador.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: AppTheme.surfaceColor,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: AppTheme.dividerColor),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppTheme.primaryColor.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: const Icon(Icons.emoji_events_rounded, color: AppTheme.primaryColor, size: 28),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '¡Aún no hay ganadores!',
+                    style: GoogleFonts.outfit(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: AppTheme.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'Los ganadores aparecerán aquí cuando se establezcan',
+                    style: GoogleFonts.outfit(
+                      fontSize: 12,
+                      color: AppTheme.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
 
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           children: [
-            const Icon(Icons.emoji_events_rounded, color: AppTheme.primaryColor),
+            const Icon(Icons.emoji_events_rounded, color: AppTheme.primaryColor, size: 20),
             const SizedBox(width: 8),
             Text(
               'ÚLTIMOS GANADORES',
               style: GoogleFonts.outfit(
-                fontSize: 14,
+                fontSize: 13,
                 fontWeight: FontWeight.w800,
                 letterSpacing: 1.5,
                 color: AppTheme.textPrimary,
@@ -183,42 +258,49 @@ class _HomeScreenState extends State<HomeScreen>
             ),
           ],
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 12),
         SizedBox(
-          height: 120,
+          height: 110,
           child: ListView.builder(
             scrollDirection: Axis.horizontal,
             itemCount: rifasConGanador.length,
             itemBuilder: (context, index) {
               final rifa = rifasConGanador[index];
               return Container(
-                width: 280,
-                margin: const EdgeInsets.only(right: 16),
+                width: 260,
+                margin: const EdgeInsets.only(right: 12),
                 decoration: BoxDecoration(
-                  color: AppTheme.surfaceColor,
-                  borderRadius: BorderRadius.circular(20),
+                  gradient: LinearGradient(
+                    colors: [
+                      AppTheme.surfaceColor,
+                      AppTheme.primaryColor.withValues(alpha: 0.05),
+                    ],
+                    begin: Alignment.centerLeft,
+                    end: Alignment.centerRight,
+                  ),
+                  borderRadius: BorderRadius.circular(18),
                   border: Border.all(color: AppTheme.primaryColor.withValues(alpha: 0.3)),
                 ),
                 child: Row(
                   children: [
                     Container(
-                      width: 80,
+                      width: 70,
                       decoration: BoxDecoration(
                         color: AppTheme.primaryColor.withValues(alpha: 0.1),
                         borderRadius: const BorderRadius.only(
-                          topLeft: Radius.circular(19),
-                          bottomLeft: Radius.circular(19),
+                          topLeft: Radius.circular(17),
+                          bottomLeft: Radius.circular(17),
                         ),
                       ),
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          const Icon(Icons.military_tech_rounded, color: AppTheme.primaryColor, size: 24),
+                          const Icon(Icons.military_tech_rounded, color: AppTheme.primaryColor, size: 22),
                           const SizedBox(height: 4),
                           Text(
                             rifa.numeroGanador!,
                             style: GoogleFonts.outfit(
-                              fontSize: 24,
+                              fontSize: 22,
                               fontWeight: FontWeight.w900,
                               color: AppTheme.primaryColor,
                             ),
@@ -228,27 +310,27 @@ class _HomeScreenState extends State<HomeScreen>
                     ),
                     Expanded(
                       child: Padding(
-                        padding: const EdgeInsets.all(12),
+                        padding: const EdgeInsets.all(10),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             Text(
                               rifa.nombre,
-                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                             ),
                             const SizedBox(height: 4),
                             Text(
                               'Lotería: ${rifa.loteria ?? "N/A"}',
-                              style: Theme.of(context).textTheme.bodySmall,
+                              style: Theme.of(context).textTheme.bodySmall?.copyWith(fontSize: 11),
                             ),
-                            const SizedBox(height: 4),
-                            Text(
-                              DateFormat('dd/MM/yyyy').format(rifa.fechaSorteo ?? rifa.fechaCreacion),
-                              style: Theme.of(context).textTheme.bodySmall?.copyWith(fontSize: 10),
-                            ),
+                            if (rifa.fechaSorteo != null)
+                              Text(
+                                DateFormat('dd/MM/yyyy').format(rifa.fechaSorteo!),
+                                style: Theme.of(context).textTheme.bodySmall?.copyWith(fontSize: 10),
+                              ),
                           ],
                         ),
                       ),
@@ -267,110 +349,69 @@ class _HomeScreenState extends State<HomeScreen>
     return Consumer<RifaProvider>(
       builder: (context, provider, child) {
         final rifasActivas = provider.rifas.where((r) => r.activa).length;
+        final totalNumeros = provider.rifas.fold(0, (sum, r) => sum + r.cantidadNumeros);
 
-        return Container(
-          width: double.infinity,
-          decoration: BoxDecoration(
-            gradient: AppTheme.goldGradient,
-            borderRadius: BorderRadius.circular(32),
-            boxShadow: [
-              BoxShadow(
-                color: AppTheme.primaryColor.withValues(alpha: 0.3),
-                blurRadius: 20,
-                offset: const Offset(0, 10),
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'RESUMEN GENERAL',
+              style: GoogleFonts.outfit(
+                fontSize: 12,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 1.5,
+                color: AppTheme.textSecondary,
               ),
-            ],
-          ),
-          child: Stack(
-            children: [
-              Positioned(
-                right: -20,
-                top: -20,
-                child: Icon(
-                  Icons.diamond_rounded,
-                  size: 150,
-                  color: Colors.white.withValues(alpha: 0.15),
+            ),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    AppTheme.primaryColor.withValues(alpha: 0.15),
+                    AppTheme.primaryColor.withValues(alpha: 0.05),
+                  ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
                 ),
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(color: AppTheme.primaryColor.withValues(alpha: 0.3)),
               ),
-              Padding(
-                padding: const EdgeInsets.all(28),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              child: Row(
                 children: [
-                  Text(
-                    'RESUMEN GENERAL',
-                    style: GoogleFonts.outfit(
-                      color: AppTheme.backgroundColor,
-                      fontWeight: FontWeight.w900,
-                      fontSize: 12,
-                      letterSpacing: 2,
-                    ),
-                  ),
-                  const Icon(
-                    Icons.auto_graph_rounded,
-                    color: AppTheme.backgroundColor,
-                    size: 20,
-                  ),
+                  Expanded(child: _buildStatItemMini('Rifas', '$rifasActivas', Icons.style_rounded, AppTheme.primaryColor)),
+                  _buildStatDivider(),
+                  Expanded(child: _buildStatItemMini('Cupos', '$totalNumeros', Icons.grid_view_rounded, Colors.blue)),
+                  _buildStatDivider(),
+                  Expanded(child: _buildStatItemMini('Total', '${provider.rifas.length}', Icons.confirmation_number_rounded, AppTheme.secondaryColor)),
                 ],
               ),
-              const SizedBox(height: 24),
-              Row(
-                children: [
-                  Expanded(
-                    child: _buildStatItem(
-                      icon: Icons.confirmation_number_rounded,
-                      value: '$rifasActivas',
-                      label: 'Rifas Activas',
-                    ),
-                  ),
-                  Container(
-                    width: 1.5,
-                    height: 50,
-                    color: AppTheme.backgroundColor.withValues(alpha: 0.1),
-                  ),
-                  Expanded(
-                    child: _buildStatItem(
-                      icon: Icons.group_rounded,
-                      value: '${provider.rifas.fold(0, (sum, r) => sum + r.cantidadNumeros)}',
-                      label: 'Cupos Totales',
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-              ),
-            ],
-          ),
+            ),
+          ],
         );
       },
     );
   }
 
-  Widget _buildStatItem({
-    required IconData icon,
-    required String value,
-    required String label,
-  }) {
+  Widget _buildStatItemMini(String label, String value, IconData icon, Color color) {
     return Column(
       children: [
+        Icon(icon, color: color, size: 22),
+        const SizedBox(height: 6),
         Text(
           value,
           style: GoogleFonts.outfit(
-            color: AppTheme.backgroundColor,
-            fontSize: 32,
+            color: AppTheme.textPrimary,
+            fontSize: 20,
             fontWeight: FontWeight.w900,
           ),
         ),
-        const SizedBox(height: 4),
         Text(
           label,
           style: GoogleFonts.outfit(
-            color: AppTheme.backgroundColor.withValues(alpha: 0.7),
-            fontSize: 12,
+            color: AppTheme.textSecondary,
+            fontSize: 10,
             fontWeight: FontWeight.w700,
           ),
         ),
@@ -378,6 +419,156 @@ class _HomeScreenState extends State<HomeScreen>
     );
   }
 
+  Widget _buildStatDivider() {
+    return Container(
+      width: 1,
+      height: 50,
+      color: AppTheme.primaryColor.withValues(alpha: 0.15),
+    );
+  }
+
+  Widget _buildQuickActions(BuildContext context, RifaProvider provider) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'ACCIONES RÁPIDAS',
+          style: GoogleFonts.outfit(
+            fontSize: 12,
+            fontWeight: FontWeight.w800,
+            letterSpacing: 1.5,
+            color: AppTheme.textSecondary,
+          ),
+        ),
+        const SizedBox(height: 12),
+        GridView.count(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          crossAxisCount: 3,
+          mainAxisSpacing: 10,
+          crossAxisSpacing: 10,
+          childAspectRatio: 1.1,
+          children: [
+            _buildQuickActionCard(
+              icon: Icons.add_circle_outline_rounded,
+              label: 'Nueva Rifa',
+              color: AppTheme.primaryColor,
+              onTap: () => Navigator.push(
+                context,
+                PageRouteBuilder(
+                  pageBuilder: (_, __, ___) => const CrearRifaScreen(),
+                  transitionsBuilder: (_, animation, __, child) => SlideTransition(
+                    position: Tween<Offset>(begin: const Offset(0, 0.15), end: Offset.zero).animate(CurvedAnimation(parent: animation, curve: Curves.easeOutCubic)),
+                    child: FadeTransition(opacity: animation, child: child),
+                  ),
+                  transitionDuration: const Duration(milliseconds: 350),
+                ),
+              ),
+            ),
+            _buildQuickActionCard(
+              icon: Icons.qr_code_scanner_rounded,
+              label: 'Ver Estado',
+              color: Colors.blue,
+              onTap: () {
+                if (provider.rifaSeleccionada != null) {
+                  Navigator.push(context, MaterialPageRoute(builder: (_) => const ImagenEstadoScreen()));
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Selecciona una rifa primero'), backgroundColor: Colors.orange),
+                  );
+                }
+              },
+            ),
+            _buildQuickActionCard(
+              icon: Icons.people_alt_rounded,
+              label: 'Ventas',
+              color: Colors.teal,
+              onTap: () {
+                if (provider.rifas.isNotEmpty) {
+                  Navigator.push(context, MaterialPageRoute(builder: (_) => SalesListScreen(rifa: provider.rifas.first)));
+                }
+              },
+            ),
+            _buildQuickActionCard(
+              icon: Icons.download_for_offline_rounded,
+              label: 'Exportar',
+              color: Colors.purple,
+              onTap: () {
+                if (provider.rifas.isNotEmpty) {
+                  provider.exportarDatosCSV();
+                }
+              },
+            ),
+            _buildQuickActionCard(
+              icon: Icons.smart_toy_rounded,
+              label: 'WhatsApp',
+              color: Colors.green,
+              onTap: () {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Ve a Configuración > Chatbot WhatsApp'), backgroundColor: Colors.orange),
+                );
+              },
+            ),
+            _buildQuickActionCard(
+              icon: Icons.bar_chart_rounded,
+              label: 'Stats',
+              color: Colors.orange,
+              onTap: () {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Ve a la pestaña de Estadísticas'), backgroundColor: Colors.orange),
+                );
+              },
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildQuickActionCard({
+    required IconData icon,
+    required String label,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(18),
+        child: Container(
+          decoration: BoxDecoration(
+            color: AppTheme.cardColor,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: color.withValues(alpha: 0.2)),
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Icon(icon, color: color, size: 24),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                label,
+                style: GoogleFonts.outfit(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  color: AppTheme.textPrimary,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 
   Widget _buildActiveRifasTitle() {
     return Row(
@@ -390,7 +581,14 @@ class _HomeScreenState extends State<HomeScreen>
         TextButton.icon(
           onPressed: () => Navigator.push(
             context,
-            MaterialPageRoute(builder: (_) => const CrearRifaScreen()),
+            PageRouteBuilder(
+              pageBuilder: (_, __, ___) => const CrearRifaScreen(),
+              transitionsBuilder: (_, animation, __, child) => SlideTransition(
+                position: Tween<Offset>(begin: const Offset(0, 0.15), end: Offset.zero).animate(CurvedAnimation(parent: animation, curve: Curves.easeOutCubic)),
+                child: FadeTransition(opacity: animation, child: child),
+              ),
+              transitionDuration: const Duration(milliseconds: 350),
+            ),
           ),
           icon: const Icon(Icons.add, size: 18),
           label: const Text('Nueva'),

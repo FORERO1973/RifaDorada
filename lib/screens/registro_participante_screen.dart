@@ -26,8 +26,10 @@ class _RegistroParticipanteScreenState
   final _nombreController = TextEditingController();
   final _whatsappController = TextEditingController();
   final _documentoController = TextEditingController();
+  final _notasController = TextEditingController();
   String _ciudadSeleccionada = AppConstants.ciudadesColombia.first;
   bool _isPickingContact = false;
+  bool _enviarWhatsApp = true;
 
   Future<void> _pickContact() async {
     if (kIsWeb) {
@@ -45,18 +47,15 @@ class _RegistroParticipanteScreenState
         setState(() => _isPickingContact = false);
 
         if (contact != null) {
-          // Obtener detalles completos del contacto seleccionado
           final fullContact = await FlutterContacts.getContact(contact.id);
           if (fullContact != null) {
             setState(() {
               _nombreController.text = fullContact.displayName;
               if (fullContact.phones.isNotEmpty) {
-                // Limpiar el número de espacios y caracteres especiales
                 String phone = fullContact.phones.first.number
                     .replaceAll(RegExp(r'\s+'), '')
                     .replaceAll(RegExp(r'[^\d+]'), '');
                 
-                // Si el número empieza por +57, quitarlo o ajustarlo según necesidad
                 if (phone.startsWith('+57')) {
                   phone = phone.substring(3);
                 } else if (phone.startsWith('57') && phone.length > 10) {
@@ -90,6 +89,7 @@ class _RegistroParticipanteScreenState
     _nombreController.dispose();
     _whatsappController.dispose();
     _documentoController.dispose();
+    _notasController.dispose();
     super.dispose();
   }
 
@@ -99,31 +99,22 @@ class _RegistroParticipanteScreenState
     final rifa = provider.rifaSeleccionada;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Registrar Participante')),
+      appBar: AppBar(
+        title: const Text('Registrar Participante'),
+      ),
       body: Form(
         key: _formKey,
         child: ListView(
           padding: const EdgeInsets.all(20),
           children: [
             _buildSelectionSummary(provider),
-            const SizedBox(height: 24),
-            OutlinedButton.icon(
-              onPressed: _isPickingContact ? null : _pickContact,
-              icon: _isPickingContact 
-                  ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
-                  : const Icon(Icons.contact_phone_rounded),
-              label: const Text('BUSCAR EN MIS CONTACTOS'),
-              style: OutlinedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                side: const BorderSide(color: AppTheme.primaryColor),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              ),
-            ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 20),
+            _buildContactButton(),
+            const SizedBox(height: 20),
             _buildTextField(
               controller: _nombreController,
               label: 'Nombre Completo',
-              icon: Icons.person,
+              icon: Icons.person_outline_rounded,
               validator: (value) {
                 if (value == null || value.isEmpty) {
                   return 'Por favor ingrese su nombre';
@@ -135,7 +126,7 @@ class _RegistroParticipanteScreenState
             _buildTextField(
               controller: _whatsappController,
               label: 'WhatsApp',
-              icon: Icons.phone,
+              icon: Icons.phone_android_rounded,
               keyboardType: TextInputType.phone,
               validator: (value) {
                 if (value == null || value.isEmpty) {
@@ -148,44 +139,48 @@ class _RegistroParticipanteScreenState
               },
             ),
             const SizedBox(height: 16),
-            DropdownButtonFormField<String>(
-              initialValue: _ciudadSeleccionada,
-              decoration: InputDecoration(
-                labelText: 'Ciudad',
-                prefixIcon: const Icon(Icons.location_city),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-              items: AppConstants.ciudadesColombia.map((ciudad) {
-                return DropdownMenuItem(value: ciudad, child: Text(ciudad));
-              }).toList(),
-              onChanged: (value) {
-                setState(() {
-                  _ciudadSeleccionada = value!;
-                });
-              },
-            ),
+            _buildCityDropdown(),
             const SizedBox(height: 16),
             _buildTextField(
               controller: _documentoController,
               label: 'Documento (opcional)',
-              icon: Icons.badge,
+              icon: Icons.badge_outlined,
               keyboardType: TextInputType.number,
             ),
-            const SizedBox(height: 32),
+            const SizedBox(height: 16),
+            _buildTextField(
+              controller: _notasController,
+              label: 'Notas (opcional)',
+              icon: Icons.note_add_outlined,
+              maxLines: 2,
+            ),
+            const SizedBox(height: 20),
+            _buildWhatsAppToggle(),
+            const SizedBox(height: 20),
             _buildTotalSection(provider, rifa!),
             const SizedBox(height: 24),
             ElevatedButton(
               onPressed: provider.isLoading ? null : _submitForm,
+              style: ElevatedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 18),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              ),
               child: provider.isLoading
                   ? const SizedBox(
                       height: 20,
                       width: 20,
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
-                  : const Text('Confirmar Registro'),
+                  : const Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.check_circle_outline_rounded),
+                        SizedBox(width: 10),
+                        Text('CONFIRMAR REGISTRO', style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 0.5)),
+                      ],
+                    ),
             ),
+            const SizedBox(height: 40),
           ],
         ),
       ),
@@ -194,42 +189,51 @@ class _RegistroParticipanteScreenState
 
   Widget _buildSelectionSummary(RifaProvider provider) {
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppTheme.surfaceColor,
-        borderRadius: BorderRadius.circular(24),
+        color: AppTheme.cardColor,
+        borderRadius: BorderRadius.circular(20),
         border: Border.all(color: AppTheme.dividerColor),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'NÚMEROS SELECCIONADOS',
-            style: GoogleFonts.outfit(
-              fontSize: 10,
-              fontWeight: FontWeight.w800,
-              letterSpacing: 1.5,
-              color: AppTheme.textSecondary,
-            ),
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: AppTheme.primaryColor.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.confirmation_number_rounded, color: AppTheme.primaryColor, size: 20),
+              ),
+              const SizedBox(width: 12),
+              Text(
+                'NÚMEROS SELECCIONADOS',
+                style: GoogleFonts.outfit(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 1.5,
+                  color: AppTheme.textSecondary,
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 12),
           Wrap(
-            spacing: 10,
-            runSpacing: 10,
+            spacing: 8,
+            runSpacing: 8,
             children: provider.numerosSeleccionados.map((val) {
               return Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 8,
-                ),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 decoration: BoxDecoration(
                   gradient: AppTheme.goldGradient,
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(10),
                   boxShadow: [
                     BoxShadow(
-                      color: AppTheme.primaryColor.withValues(alpha: 0.2),
-                      blurRadius: 8,
-                      offset: const Offset(0, 4),
+                      color: AppTheme.primaryColor.withValues(alpha: 0.15),
+                      blurRadius: 4,
                     ),
                   ],
                 ),
@@ -238,10 +242,91 @@ class _RegistroParticipanteScreenState
                   style: GoogleFonts.outfit(
                     fontWeight: FontWeight.w900,
                     color: AppTheme.backgroundColor,
+                    fontSize: 13,
                   ),
                 ),
               );
             }).toList(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildContactButton() {
+    return OutlinedButton.icon(
+      onPressed: _isPickingContact ? null : _pickContact,
+      icon: _isPickingContact 
+          ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+          : const Icon(Icons.contact_phone_rounded),
+      label: const Text('BUSCAR EN MIS CONTACTOS'),
+      style: OutlinedButton.styleFrom(
+        padding: const EdgeInsets.symmetric(vertical: 14),
+        side: const BorderSide(color: AppTheme.primaryColor),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
+    );
+  }
+
+  Widget _buildCityDropdown() {
+    return DropdownButtonFormField<String>(
+      initialValue: _ciudadSeleccionada,
+      decoration: InputDecoration(
+        labelText: 'Ciudad',
+        prefixIcon: const Icon(Icons.location_city_rounded),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+      ),
+      items: AppConstants.ciudadesColombia.map((ciudad) {
+        return DropdownMenuItem(value: ciudad, child: Text(ciudad));
+      }).toList(),
+      onChanged: (value) {
+        setState(() => _ciudadSeleccionada = value!);
+      },
+    );
+  }
+
+  Widget _buildWhatsAppToggle() {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.green.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Colors.green.withValues(alpha: 0.2)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: Colors.green.withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: const Icon(Icons.chat_rounded, color: Colors.green, size: 22),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Enviar WhatsApp automático',
+                  style: GoogleFonts.outfit(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 13,
+                    color: Colors.green.shade700,
+                  ),
+                ),
+                Text(
+                  'Enviar confirmación al participante',
+                  style: GoogleFonts.outfit(fontSize: 11, color: AppTheme.textSecondary),
+                ),
+              ],
+            ),
+          ),
+          Switch.adaptive(
+            value: _enviarWhatsApp,
+            onChanged: (v) => setState(() => _enviarWhatsApp = v),
+            activeThumbColor: Colors.green,
           ),
         ],
       ),
@@ -253,15 +338,18 @@ class _RegistroParticipanteScreenState
     required String label,
     required IconData icon,
     TextInputType? keyboardType,
+    int maxLines = 1,
     String? Function(String?)? validator,
   }) {
     return TextFormField(
       controller: controller,
       keyboardType: keyboardType,
+      maxLines: maxLines,
       style: GoogleFonts.outfit(fontWeight: FontWeight.w600),
       decoration: InputDecoration(
         labelText: label,
         prefixIcon: Icon(icon, color: AppTheme.primaryColor),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
       ),
       validator: validator,
     );
@@ -269,10 +357,10 @@ class _RegistroParticipanteScreenState
 
   Widget _buildTotalSection(RifaProvider provider, Rifa rifa) {
     return Container(
-      padding: const EdgeInsets.all(28),
+      padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
         gradient: AppTheme.goldGradient,
-        borderRadius: BorderRadius.circular(32),
+        borderRadius: BorderRadius.circular(28),
         boxShadow: [
           BoxShadow(
             color: AppTheme.primaryColor.withValues(alpha: 0.3),
@@ -290,7 +378,7 @@ class _RegistroParticipanteScreenState
               Text(
                 'TOTAL A PAGAR',
                 style: GoogleFonts.outfit(
-                  fontSize: 12,
+                  fontSize: 11,
                   fontWeight: FontWeight.w900,
                   letterSpacing: 1.5,
                   color: AppTheme.backgroundColor.withValues(alpha: 0.7),
@@ -300,7 +388,7 @@ class _RegistroParticipanteScreenState
               Text(
                 AppConstants.formatCurrencyCOP(provider.totalSeleccion),
                 style: GoogleFonts.outfit(
-                  fontSize: 32,
+                  fontSize: 28,
                   fontWeight: FontWeight.w900,
                   color: AppTheme.backgroundColor,
                 ),
@@ -308,22 +396,21 @@ class _RegistroParticipanteScreenState
             ],
           ),
           Container(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
               color: AppTheme.backgroundColor,
-              borderRadius: BorderRadius.circular(20),
+              borderRadius: BorderRadius.circular(18),
             ),
             child: const Icon(
               Icons.payments_rounded,
               color: AppTheme.primaryColor,
-              size: 32,
+              size: 28,
             ),
           ),
         ],
       ),
     );
   }
-
 
   Future<void> _submitForm() async {
     if (!_formKey.currentState!.validate()) return;
@@ -371,8 +458,7 @@ class _RegistroParticipanteScreenState
             builder: (_) => TicketScreen(
               participante: participante,
               rifa: rifa!,
-              autoSend: true,
-              autoPopAfterSend: true,
+              autoSend: _enviarWhatsApp,
             ),
           ),
         );
@@ -399,5 +485,4 @@ class _RegistroParticipanteScreenState
       }
     }
   }
-
 }

@@ -13,17 +13,35 @@ class LoginScreen extends StatefulWidget {
   State<LoginScreen> createState() => _LoginScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> {
+class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStateMixin {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _obscurePassword = true;
   bool _shouldCheckRegister = true;
   bool _showRegisterOption = false;
+  late AnimationController _animController;
+  late Animation<double> _logoScale;
+  late Animation<double> _logoFade;
+  late Animation<Offset> _formSlide;
 
   @override
   void initState() {
     super.initState();
+    _animController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1200),
+    );
+    _logoScale = Tween<double>(begin: 0.5, end: 1.0).animate(
+      CurvedAnimation(parent: _animController, curve: const Interval(0.0, 0.5, curve: Curves.easeOutBack)),
+    );
+    _logoFade = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _animController, curve: const Interval(0.0, 0.4, curve: Curves.easeOut)),
+    );
+    _formSlide = Tween<Offset>(begin: const Offset(0, 0.3), end: Offset.zero).animate(
+      CurvedAnimation(parent: _animController, curve: const Interval(0.3, 0.8, curve: Curves.easeOutCubic)),
+    );
+    _animController.forward();
     _checkRegisterOption();
   }
 
@@ -41,6 +59,7 @@ class _LoginScreenState extends State<LoginScreen> {
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
+    _animController.dispose();
     super.dispose();
   }
 
@@ -48,73 +67,101 @@ class _LoginScreenState extends State<LoginScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
-            child: Form(
-              key: _formKey,
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  _buildLogo(),
-                  const SizedBox(height: 48),
-                  _buildWelcomeText(),
-                  const SizedBox(height: 32),
-                  Consumer<AuthProvider>(
-                    builder: (context, auth, _) {
-                      if (auth.error != null) {
-                        return Padding(
-                          padding: const EdgeInsets.only(bottom: 16),
-                          child: Container(
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: AppTheme.errorColor.withValues(alpha: 0.1),
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: AppTheme.errorColor.withValues(alpha: 0.3)),
-                            ),
-                            child: Row(
-                              children: [
-                                const Icon(Icons.error_outline, color: AppTheme.errorColor, size: 20),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Text(auth.error!, style: const TextStyle(color: AppTheme.errorColor, fontSize: 13)),
-                                ),
-                              ],
-                            ),
+        child: Stack(
+          children: [
+            _buildBackgroundPattern(),
+            Center(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(24),
+                child: Form(
+                  key: _formKey,
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      SlideTransition(
+                        position: _formSlide,
+                        child: FadeTransition(
+                          opacity: _logoFade,
+                          child: ScaleTransition(
+                            scale: _logoScale,
+                            child: _buildLogo(),
                           ),
-                        );
-                      }
-                      return const SizedBox.shrink();
-                    },
+                        ),
+                      ),
+                      const SizedBox(height: 40),
+                      SlideTransition(
+                        position: _formSlide,
+                        child: Column(
+                          children: [
+                            _buildWelcomeText(),
+                            const SizedBox(height: 32),
+                            Consumer<AuthProvider>(
+                              builder: (context, auth, _) {
+                                if (auth.error != null) {
+                                  return Padding(
+                                    padding: const EdgeInsets.only(bottom: 16),
+                                    child: Container(
+                                      padding: const EdgeInsets.all(12),
+                                      decoration: BoxDecoration(
+                                        color: AppTheme.errorColor.withValues(alpha: 0.1),
+                                        borderRadius: BorderRadius.circular(12),
+                                        border: Border.all(color: AppTheme.errorColor.withValues(alpha: 0.3)),
+                                      ),
+                                      child: Row(
+                                        children: [
+                                          const Icon(Icons.error_outline, color: AppTheme.errorColor, size: 20),
+                                          const SizedBox(width: 8),
+                                          Expanded(
+                                            child: Text(auth.error!, style: const TextStyle(color: AppTheme.errorColor, fontSize: 13)),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  );
+                                }
+                                return const SizedBox.shrink();
+                              },
+                            ),
+                            _buildEmailField(),
+                            const SizedBox(height: 16),
+                            _buildPasswordField(),
+                            const SizedBox(height: 24),
+                            Consumer<AuthProvider>(
+                              builder: (context, auth, _) {
+                                return _buildLoginButton(auth.isLoading);
+                              },
+                            ),
+                            const SizedBox(height: 8),
+                            TextButton(
+                              onPressed: _showPasswordResetDialog,
+                              child: Text(
+                                '¿Olvidaste tu contraseña?',
+                                style: TextStyle(color: AppTheme.primaryColor, fontSize: 13),
+                              ),
+                            ),
+                            if (_showRegisterOption) ...[
+                              const SizedBox(height: 24),
+                              _buildRegisterOption(),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
-                  _buildEmailField(),
-                  const SizedBox(height: 16),
-                  _buildPasswordField(),
-                  const SizedBox(height: 24),
-                  Consumer<AuthProvider>(
-                    builder: (context, auth, _) {
-                      return _buildLoginButton(auth.isLoading);
-                    },
-                  ),
-                  const SizedBox(height: 8),
-                  TextButton(
-                    onPressed: _showPasswordResetDialog,
-                    child: Text(
-                      '¿Olvidaste tu contraseña?',
-                      style: TextStyle(color: AppTheme.primaryColor, fontSize: 13),
-                    ),
-                  ),
-                  if (_showRegisterOption) ...[
-                    const SizedBox(height: 24),
-                    _buildRegisterOption(),
-                  ],
-                ],
+                ),
               ),
             ),
-          ),
+          ],
         ),
       ),
+    );
+  }
+
+  Widget _buildBackgroundPattern() {
+    return CustomPaint(
+      size: Size.infinite,
+      painter: _BackgroundPatternPainter(),
     );
   }
 
@@ -147,19 +194,17 @@ class _LoginScreenState extends State<LoginScreen> {
           ],
         ),
         const SizedBox(height: 16),
-        Text(
-          'RifaDorada',
-          style: Theme.of(context).textTheme.displayLarge?.copyWith(
-            color: AppTheme.primaryColor,
-            fontWeight: FontWeight.w900,
-            letterSpacing: -1,
-            shadows: [
-              Shadow(
-                color: AppTheme.primaryColor.withValues(alpha: 0.3),
-                blurRadius: 12,
-                offset: const Offset(0, 4),
-              ),
-            ],
+        ShaderMask(
+          shaderCallback: (bounds) => const LinearGradient(
+            colors: [AppTheme.accentGold, AppTheme.primaryColor, AppTheme.primaryDark],
+          ).createShader(bounds),
+          child: Text(
+            'RifaDorada',
+            style: Theme.of(context).textTheme.displayLarge?.copyWith(
+              color: Colors.white,
+              fontWeight: FontWeight.w900,
+              letterSpacing: -1,
+            ),
           ),
         ),
       ],
@@ -194,7 +239,7 @@ class _LoginScreenState extends State<LoginScreen> {
       keyboardType: TextInputType.emailAddress,
       decoration: InputDecoration(
         labelText: 'Correo electrónico',
-        prefixIcon: const Icon(Icons.email),
+        prefixIcon: const Icon(Icons.email_outlined),
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
       ),
       validator: (value) {
@@ -211,9 +256,9 @@ class _LoginScreenState extends State<LoginScreen> {
       obscureText: _obscurePassword,
       decoration: InputDecoration(
         labelText: 'Contraseña',
-        prefixIcon: const Icon(Icons.lock),
+        prefixIcon: const Icon(Icons.lock_outline_rounded),
         suffixIcon: IconButton(
-          icon: Icon(_obscurePassword ? Icons.visibility : Icons.visibility_off),
+          icon: Icon(_obscurePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined),
           onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
         ),
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
@@ -231,8 +276,8 @@ class _LoginScreenState extends State<LoginScreen> {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: AppTheme.primaryColor.withValues(alpha: 0.2),
-            blurRadius: 15,
+            color: AppTheme.primaryColor.withValues(alpha: 0.25),
+            blurRadius: 20,
             offset: const Offset(0, 8),
           ),
         ],
@@ -255,7 +300,7 @@ class _LoginScreenState extends State<LoginScreen> {
             : Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Icon(Icons.login_rounded, weight: 700),
+                  const Icon(Icons.login_rounded),
                   const SizedBox(width: 12),
                   Text('INICIAR SESIÓN', style: GoogleFonts.outfit(fontWeight: FontWeight.w900, letterSpacing: 1)),
                 ],
@@ -283,6 +328,8 @@ class _LoginScreenState extends State<LoginScreen> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        backgroundColor: AppTheme.cardColor,
         title: const Text('Restablecer contraseña'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
@@ -310,6 +357,7 @@ class _LoginScreenState extends State<LoginScreen> {
             child: const Text('Cancelar'),
           ),
           ElevatedButton(
+            style: ElevatedButton.styleFrom(shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
             onPressed: () async {
               final email = emailCtrl.text.trim();
               if (email.isEmpty) return;
@@ -356,4 +404,37 @@ class _LoginScreenState extends State<LoginScreen> {
       // AuthGateway will handle navigation via auth state listener
     }
   }
+}
+
+class _BackgroundPatternPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = AppTheme.primaryColor.withValues(alpha: 0.03)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1;
+
+    const spacing = 40.0;
+    for (double x = 0; x < size.width; x += spacing) {
+      canvas.drawLine(Offset(x, 0), Offset(x, size.height), paint);
+    }
+    for (double y = 0; y < size.height; y += spacing) {
+      canvas.drawLine(Offset(0, y), Offset(size.width, y), paint);
+    }
+
+    final gradientPaint = Paint()
+      ..shader = LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: [
+          AppTheme.primaryColor.withValues(alpha: 0.08),
+          Colors.transparent,
+        ],
+      ).createShader(Rect.fromLTWH(0, 0, size.width, size.height * 0.4));
+
+    canvas.drawRect(Rect.fromLTWH(0, 0, size.width, size.height * 0.4), gradientPaint);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
