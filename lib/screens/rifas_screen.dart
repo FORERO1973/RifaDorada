@@ -422,7 +422,7 @@ class _RifaDetalleScreenState extends State<_RifaDetalleScreen> {
           statusColor = AppTheme.secondaryColor;
           statusLabel = 'PAGADO';
         } else if (isAbonado) {
-          statusColor = Colors.purple;
+          statusColor = Colors.orange;
           statusLabel = 'ABONADO';
         } else {
           statusColor = AppTheme.errorColor;

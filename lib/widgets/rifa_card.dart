@@ -58,7 +58,7 @@ class _RifaCardState extends State<RifaCard> with SingleTickerProviderStateMixin
       child: Container(
         margin: const EdgeInsets.only(bottom: 24),
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(24),
+          borderRadius: BorderRadius.circular(20),
           color: AppTheme.cardColor,
           boxShadow: [
             BoxShadow(
