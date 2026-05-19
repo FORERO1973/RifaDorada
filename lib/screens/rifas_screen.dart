@@ -89,14 +89,32 @@ class RifasScreen extends StatelessWidget {
   }
 }
 
-class _RifasActivasTab extends StatelessWidget {
+class _RifasActivasTab extends StatefulWidget {
+  @override
+  State<_RifasActivasTab> createState() => _RifasActivasTabState();
+}
+
+class _RifasActivasTabState extends State<_RifasActivasTab> {
+  String _searchQuery = '';
+  final _searchController = TextEditingController();
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Consumer<RifaProvider>(
       builder: (context, provider, child) {
-        final rifasActivas = provider.rifas.where((r) => r.activa).toList();
+        var rifasActivas = provider.rifas.where((r) => r.activa).toList();
+        if (_searchQuery.isNotEmpty) {
+          rifasActivas = rifasActivas.where((r) =>
+              r.nombre.toLowerCase().contains(_searchQuery.toLowerCase())).toList();
+        }
 
-        if (rifasActivas.isEmpty) {
+        if (rifasActivas.isEmpty && _searchQuery.isEmpty) {
           return Center(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -148,13 +166,39 @@ class _RifasActivasTab extends StatelessWidget {
           );
         }
 
+        if (rifasActivas.isEmpty && _searchQuery.isNotEmpty) {
+          return Column(
+            children: [
+              _buildSearchBar(),
+              Expanded(
+                child: Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.search_off_rounded, size: 64, color: AppTheme.textSecondary.withValues(alpha: 0.5)),
+                      const SizedBox(height: 16),
+                      Text('No se encontraron rifas', style: TextStyle(color: AppTheme.textSecondary)),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          );
+        }
+
         return RefreshIndicator(
           onRefresh: () => provider.loadRifas(),
           child: ListView.builder(
-            padding: const EdgeInsets.all(16),
-            itemCount: rifasActivas.length,
+            padding: const EdgeInsets.only(top: 0),
+            itemCount: rifasActivas.length + 1,
             itemBuilder: (context, index) {
-              final rifa = rifasActivas[index];
+              if (index == 0) {
+                return Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                  child: _buildSearchBar(),
+                );
+              }
+              final rifa = rifasActivas[index - 1];
               return Padding(
                 padding: const EdgeInsets.only(bottom: 16),
                 child: RifaCard(
@@ -177,6 +221,35 @@ class _RifasActivasTab extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+
+  Widget _buildSearchBar() {
+    return TextField(
+      controller: _searchController,
+      decoration: InputDecoration(
+        hintText: 'Buscar rifa por nombre...',
+        prefixIcon: const Icon(Icons.search, size: 20),
+        suffixIcon: _searchQuery.isNotEmpty
+            ? IconButton(
+                icon: const Icon(Icons.clear, size: 18),
+                onPressed: () {
+                  _searchController.clear();
+                  setState(() => _searchQuery = '');
+                },
+              )
+            : null,
+        filled: true,
+        fillColor: AppTheme.surfaceColor,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: AppTheme.dividerColor),
+        ),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        isDense: true,
+      ),
+      style: const TextStyle(fontSize: 14),
+      onChanged: (value) => setState(() => _searchQuery = value),
     );
   }
 
@@ -215,14 +288,32 @@ class _RifasActivasTab extends StatelessWidget {
   }
 }
 
-class _RifasCerradasTab extends StatelessWidget {
+class _RifasCerradasTab extends StatefulWidget {
+  @override
+  State<_RifasCerradasTab> createState() => _RifasCerradasTabState();
+}
+
+class _RifasCerradasTabState extends State<_RifasCerradasTab> {
+  String _searchQuery = '';
+  final _searchController = TextEditingController();
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Consumer<RifaProvider>(
       builder: (context, provider, child) {
-        final rifasCerradas = provider.rifas.where((r) => !r.activa).toList();
+        var rifasCerradas = provider.rifas.where((r) => !r.activa).toList();
+        if (_searchQuery.isNotEmpty) {
+          rifasCerradas = rifasCerradas.where((r) =>
+              r.nombre.toLowerCase().contains(_searchQuery.toLowerCase())).toList();
+        }
 
-        if (rifasCerradas.isEmpty) {
+        if (rifasCerradas.isEmpty && _searchQuery.isEmpty) {
           return Center(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -235,13 +326,39 @@ class _RifasCerradasTab extends StatelessWidget {
           );
         }
 
+        if (rifasCerradas.isEmpty && _searchQuery.isNotEmpty) {
+          return Column(
+            children: [
+              _buildSearchBar(),
+              Expanded(
+                child: Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.search_off_rounded, size: 64, color: AppTheme.textSecondary.withValues(alpha: 0.5)),
+                      const SizedBox(height: 16),
+                      Text('No se encontraron rifas', style: TextStyle(color: AppTheme.textSecondary)),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          );
+        }
+
         return RefreshIndicator(
           onRefresh: () => provider.loadRifas(),
           child: ListView.builder(
-            padding: const EdgeInsets.all(16),
-            itemCount: rifasCerradas.length,
+            padding: const EdgeInsets.only(top: 0),
+            itemCount: rifasCerradas.length + 1,
             itemBuilder: (context, index) {
-              final rifa = rifasCerradas[index];
+              if (index == 0) {
+                return Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                  child: _buildSearchBar(),
+                );
+              }
+              final rifa = rifasCerradas[index - 1];
               return Padding(
                 padding: const EdgeInsets.only(bottom: 16),
                 child: RifaCard(
@@ -254,6 +371,35 @@ class _RifasCerradasTab extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+
+  Widget _buildSearchBar() {
+    return TextField(
+      controller: _searchController,
+      decoration: InputDecoration(
+        hintText: 'Buscar rifa por nombre...',
+        prefixIcon: const Icon(Icons.search, size: 20),
+        suffixIcon: _searchQuery.isNotEmpty
+            ? IconButton(
+                icon: const Icon(Icons.clear, size: 18),
+                onPressed: () {
+                  _searchController.clear();
+                  setState(() => _searchQuery = '');
+                },
+              )
+            : null,
+        filled: true,
+        fillColor: AppTheme.surfaceColor,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: AppTheme.dividerColor),
+        ),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        isDense: true,
+      ),
+      style: const TextStyle(fontSize: 14),
+      onChanged: (value) => setState(() => _searchQuery = value),
     );
   }
 }

@@ -280,6 +280,7 @@ class RifaProvider extends ChangeNotifier {
 
       await loadNumeros(_rifaSeleccionada!.id);
       clearSeleccion();
+      await loadRifas();
 
       return id;
     } catch (e) {
