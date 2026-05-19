@@ -19,6 +19,7 @@ class Rifa {
   final String? organizacionId;
   final String? creadoPor;
   final String? vendedorId;
+  final List<String> vendedoresAsignados;
 
   Rifa({
     required this.id,
@@ -40,6 +41,7 @@ class Rifa {
     this.organizacionId,
     this.creadoPor,
     this.vendedorId,
+    this.vendedoresAsignados = const [],
   });
 
   factory Rifa.fromMap(Map<String, dynamic> map, String id) {
@@ -67,6 +69,7 @@ class Rifa {
       organizacionId: map['organizacionId'],
       creadoPor: map['creadoPor'],
       vendedorId: map['vendedorId'],
+      vendedoresAsignados: List<String>.from(map['vendedoresAsignados'] ?? []),
     );
   }
 
@@ -90,6 +93,7 @@ class Rifa {
       'organizacionId': organizacionId,
       'creadoPor': creadoPor,
       'vendedorId': vendedorId,
+      'vendedoresAsignados': vendedoresAsignados,
     };
   }
 
@@ -113,6 +117,7 @@ class Rifa {
     String? organizacionId,
     String? creadoPor,
     String? vendedorId,
+    List<String>? vendedoresAsignados,
   }) {
     return Rifa(
       id: id ?? this.id,
@@ -134,6 +139,7 @@ class Rifa {
       organizacionId: organizacionId ?? this.organizacionId,
       creadoPor: creadoPor ?? this.creadoPor,
       vendedorId: vendedorId ?? this.vendedorId,
+      vendedoresAsignados: vendedoresAsignados ?? this.vendedoresAsignados,
     );
   }
 

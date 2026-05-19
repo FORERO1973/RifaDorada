@@ -15,6 +15,14 @@ class RifaProvider extends ChangeNotifier {
   List<Rifa> _rifas = [];
   List<Rifa> get rifas => _rifas;
 
+  List<Rifa> get rifasVisibles {
+    if (_esAdmin || _userId == null) return _rifas;
+    return _rifas.where((r) =>
+      r.vendedoresAsignados.isEmpty ||
+      r.vendedoresAsignados.contains(_userId)
+    ).toList();
+  }
+
   String? _organizacionId;
   String? _userId;
   bool _esAdmin = true;

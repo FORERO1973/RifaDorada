@@ -24,10 +24,10 @@ class _VendedorHomeScreenState extends State<VendedorHomeScreen> {
       final provider = context.read<RifaProvider>();
       final auth = context.read<AuthProvider>();
       await provider.loadRifas();
-      if (provider.rifas.isNotEmpty) {
+      if (provider.rifasVisibles.isNotEmpty) {
         final vendedorId = auth.currentUser?.uid;
         List<Participante> all = [];
-        for (final r in provider.rifas) {
+        for (final r in provider.rifasVisibles) {
           try {
             final pList = await FirebaseService.instance
                 .getParticipantesOnce(r.id, vendedorId: vendedorId);
@@ -44,7 +44,7 @@ class _VendedorHomeScreenState extends State<VendedorHomeScreen> {
     final auth = context.watch<AuthProvider>();
     final provider = context.watch<RifaProvider>();
     final user = auth.currentUser;
-    final rifasActivas = provider.rifas.where((r) => r.activa).toList();
+    final rifasActivas = provider.rifasVisibles.where((r) => r.activa).toList();
     final misParticipantes = provider.participantes;
 
     return Scaffold(

@@ -11,8 +11,10 @@ import 'package:http/http.dart' as http;
 import '../config/theme.dart';
 import '../config/constants.dart';
 import '../providers/rifa_provider.dart';
+import '../providers/auth_provider.dart';
 import '../widgets/rifa_card.dart';
 import '../models/rifa.dart';
+import '../models/user.dart';
 import 'crear_rifa_screen.dart';
 import 'selector_numeros_screen.dart';
 
@@ -505,11 +507,27 @@ class _HomeScreenState extends State<HomeScreen>
     String? selectedLoteria = rifa.loteria;
     String? selectedDia = rifa.diaSorteo;
     DateTime? selectedFecha = rifa.fechaSorteo;
+    List<UserModel> vendedores = [];
+    List<String> selectedVendedores = List.from(rifa.vendedoresAsignados);
+    bool loadingVendedores = true;
 
     showDialog(
       context: context,
       builder: (dialogContext) => StatefulBuilder(
-        builder: (context, setState) => AlertDialog(
+        builder: (context, setState) {
+          final auth = context.read<AuthProvider>();
+          final isAdmin = auth.esAdmin;
+          if (isAdmin && loadingVendedores) {
+            auth.getUsersInOrg(auth.organizacionId!).then((users) {
+              if (dialogContext.mounted) {
+                setState(() {
+                  vendedores = users.where((u) => u.esVendedor && u.activo).toList();
+                  loadingVendedores = false;
+                });
+              }
+            });
+          }
+          return AlertDialog(
           title: const Text('Editar Rifa'),
           contentPadding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
           content: SingleChildScrollView(
@@ -673,6 +691,39 @@ class _HomeScreenState extends State<HomeScreen>
                       ),
                     ),
                   ),
+                if (isAdmin) ...[
+                  const SizedBox(height: 16),
+                  Text('Asignar Vendedores', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppTheme.textSecondary)),
+                  const SizedBox(height: 6),
+                  if (loadingVendedores)
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 8),
+                      child: Center(child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))),
+                    )
+                  else if (vendedores.isEmpty)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      child: Text('No hay vendedores activos en tu organización', style: TextStyle(fontSize: 11, color: AppTheme.textSecondary)),
+                    )
+                  else
+                    ...vendedores.map((v) => CheckboxListTile(
+                      dense: true,
+                      visualDensity: VisualDensity.compact,
+                      contentPadding: EdgeInsets.zero,
+                      title: Text(v.nombre, style: const TextStyle(fontSize: 13)),
+                      subtitle: Text(v.email, style: TextStyle(fontSize: 10, color: AppTheme.textSecondary)),
+                      value: selectedVendedores.contains(v.uid),
+                      onChanged: (checked) {
+                        setState(() {
+                          if (checked == true) {
+                            selectedVendedores.add(v.uid);
+                          } else {
+                            selectedVendedores.remove(v.uid);
+                          }
+                        });
+                      },
+                    )),
+                ],
               ],
             ),
           ),
@@ -721,6 +772,7 @@ class _HomeScreenState extends State<HomeScreen>
                     diaSorteo: selectedDia,
                     fechaSorteo: selectedFecha,
                     imagenes: finalImages,
+                    vendedoresAsignados: selectedVendedores,
                   );
                   await provider.actualizarRifa(updatedRifa);
                   if (dialogContext.mounted) Navigator.pop(dialogContext);
@@ -735,11 +787,12 @@ class _HomeScreenState extends State<HomeScreen>
                 }
               },
               child: saving
-                  ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
-                  : const Text('Guardar', style: TextStyle(fontSize: 13)),
-            ),
-          ],
-        ),
+                    ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                    : const Text('Guardar', style: TextStyle(fontSize: 13)),
+              ),
+            ],
+          );
+        },
       ),
     );
   }

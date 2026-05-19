@@ -30,7 +30,7 @@ class _VendedorVentasScreenState extends State<VendedorVentasScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       final provider = context.read<RifaProvider>();
       await provider.loadRifas();
-      if (provider.rifas.isNotEmpty) {
+      if (provider.rifasVisibles.isNotEmpty) {
         await _loadParticipantsForFilter(provider);
       }
     });
@@ -42,7 +42,7 @@ class _VendedorVentasScreenState extends State<VendedorVentasScreen> {
 
     if (_filterRifaId == 'todas') {
       List<Participante> all = [];
-      for (final r in provider.rifas) {
+      for (final r in provider.rifasVisibles) {
         try {
           final pList = await FirebaseService.instance
               .getParticipantesOnce(r.id, vendedorId: vendedorId);
@@ -127,7 +127,7 @@ class _VendedorVentasScreenState extends State<VendedorVentasScreen> {
 
     final rid = _filterRifaId != 'todas' ? _filterRifaId : null;
     final rName = _filterRifaId != 'todas'
-        ? provider.rifas.where((r) => r.id == _filterRifaId).firstOrNull?.nombre
+        ? provider.rifasVisibles.where((r) => r.id == _filterRifaId).firstOrNull?.nombre
         : null;
 
     showDialog(
@@ -175,7 +175,7 @@ class _VendedorVentasScreenState extends State<VendedorVentasScreen> {
                 }
                 final numerosMap = await FirebaseService.instance.getNumeros(rid);
                 final numerosEstado = numerosMap.map((k, v) => MapEntry(k, v.estado.name));
-                final rifa = provider.rifas.firstWhere((r) => r.id == rid);
+                final rifa = provider.rifasVisibles.firstWhere((r) => r.id == rid);
                 await ReportService.instance.generatePdfReport(
                   rifa: rifa,
                   participantes: participantes,
@@ -239,7 +239,7 @@ class _VendedorVentasScreenState extends State<VendedorVentasScreen> {
             isExpanded: true,
             items: [
               const DropdownMenuItem(value: 'todas', child: Text('Todas las rifas')),
-              ...provider.rifas.map((r) => DropdownMenuItem(
+              ...provider.rifasVisibles.map((r) => DropdownMenuItem(
                     value: r.id,
                     child: Text(r.nombre, overflow: TextOverflow.ellipsis),
                   )),
@@ -271,7 +271,7 @@ class _VendedorVentasScreenState extends State<VendedorVentasScreen> {
       estadoLabel = 'PENDIENTE';
     }
 
-    final rifa = provider.rifas.where((r) => r.id == p.rifaId).firstOrNull;
+    final rifa = provider.rifasVisibles.where((r) => r.id == p.rifaId).firstOrNull;
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
