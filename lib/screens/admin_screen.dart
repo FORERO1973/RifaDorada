@@ -9,6 +9,7 @@ import '../services/firebase_service.dart';
 import '../services/report_service.dart';
 import '../widgets/edit_rifa_dialog.dart';
 import 'sales_list_screen.dart';
+import 'admin_users_screen.dart';
 
 class AdminScreen extends StatefulWidget {
   const AdminScreen({super.key});
@@ -36,6 +37,8 @@ class _AdminScreenState extends State<AdminScreen> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
+                  _buildManageUsersCard(),
+                  const SizedBox(height: 24),
                   Container(
                     padding: const EdgeInsets.all(24),
                     decoration: BoxDecoration(
@@ -69,9 +72,15 @@ class _AdminScreenState extends State<AdminScreen> {
             color: AppTheme.primaryColor,
             child: ListView.builder(
               padding: const EdgeInsets.all(16),
-              itemCount: provider.rifas.length,
+              itemCount: provider.rifas.length + 1,
               itemBuilder: (context, index) {
-                final rifa = provider.rifas[index];
+                if (index == 0) {
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 16),
+                    child: _buildManageUsersCard(),
+                  );
+                }
+                final rifa = provider.rifas[index - 1];
                 return _buildAdminRifaCard(context, rifa, provider);
               },
             ),
@@ -163,6 +172,73 @@ class _AdminScreenState extends State<AdminScreen> {
           const Divider(color: AppTheme.dividerColor, height: 24),
           _buildActionsSection(context, rifa, provider),
         ],
+      ),
+    );
+  }
+
+  Widget _buildManageUsersCard() {
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            AppTheme.primaryColor.withValues(alpha: 0.12),
+            AppTheme.primaryColor.withValues(alpha: 0.04),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppTheme.primaryColor.withValues(alpha: 0.3)),
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () => Navigator.push(
+            context,
+            PageRouteBuilder(
+              pageBuilder: (_, __, ___) => const AdminUsersScreen(),
+              transitionsBuilder: (_, animation, __, child) => FadeTransition(opacity: animation, child: child),
+              transitionDuration: const Duration(milliseconds: 250),
+            ),
+          ),
+          borderRadius: BorderRadius.circular(20),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: AppTheme.primaryColor.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: const Icon(Icons.people_alt_rounded, color: AppTheme.primaryColor, size: 28),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Gestionar Usuarios',
+                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: AppTheme.primaryColor,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'Crear vendedores y administrar equipo',
+                        style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+                      ),
+                    ],
+                  ),
+                ),
+                const Icon(Icons.chevron_right_rounded, color: AppTheme.primaryColor, size: 24),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
