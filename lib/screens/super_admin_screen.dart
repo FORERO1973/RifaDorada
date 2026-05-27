@@ -441,7 +441,7 @@ class _OrganizacionesScreenState extends State<_OrganizacionesScreen> {
   void _toggleOrg(BuildContext context, Organizacion org) async {
     final auth = context.read<AuthProvider>();
     final success = await auth.toggleOrgActive(org.id, !org.activa);
-    if (success && mounted) {
+    if (success && context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(org.activa ? '🔴 Organización suspendida' : '🟢 Organización activada'),
@@ -465,7 +465,7 @@ class _OrganizacionesScreenState extends State<_OrganizacionesScreen> {
               Navigator.pop(ctx);
               final auth = context.read<AuthProvider>();
               final success = await auth.deleteOrganizacion(org.id);
-              if (mounted) {
+              if (context.mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
                     content: Text(success ? '✅ Organización eliminada' : '⚠️ Error al eliminar'),

@@ -89,17 +89,6 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> _loadOrgData(String orgId) async {
-    try {
-      final doc = await _firestore.collection('organizaciones').doc(orgId).get();
-      if (doc.exists) {
-        _currentOrg = Organizacion.fromMap(doc.data()!, doc.id);
-      }
-    } catch (e) {
-      debugPrint('[AUTH] Error loading org data: $e');
-    }
-  }
-
   Future<bool> login(String email, String password) async {
     _isLoading = true;
     _error = null;
@@ -379,42 +368,6 @@ class AuthProvider extends ChangeNotifier {
     } catch (e) {
       debugPrint('[AUTH] Error updating org: $e');
       rethrow;
-    }
-  }
-
-  Future<void> _migrateExistingData(String orgId, String uid) async {
-    try {
-      int count = 0;
-      final batch = _firestore.batch();
-
-      final allRifas = await _firestore.collection('rifas').get();
-      for (final doc in allRifas.docs) {
-        if (!doc.data().containsKey('organizacionId') || doc.data()['organizacionId'] == null) {
-          batch.update(doc.reference, {
-            'organizacionId': orgId,
-            'creadoPor': uid,
-          });
-          count++;
-        }
-      }
-
-      final allParticipantes = await _firestore.collection('participantes').get();
-      for (final doc in allParticipantes.docs) {
-        if (!doc.data().containsKey('organizacionId') || doc.data()['organizacionId'] == null) {
-          batch.update(doc.reference, {
-            'organizacionId': orgId,
-            'creadoPor': uid,
-          });
-          count++;
-        }
-      }
-
-      if (count > 0) {
-        await batch.commit();
-        debugPrint('[MIGRATION] $count documentos asignados a la organización $orgId');
-      }
-    } catch (e) {
-      debugPrint('[MIGRATION] Error: $e');
     }
   }
 

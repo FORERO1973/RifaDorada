@@ -980,7 +980,7 @@ class _CrearRifaScreenState extends State<CrearRifaScreen> {
     }
     final response = await http.post(
       uri,
-      headers: {'Content-Type': 'application/json'},
+      headers: {'Content-Type': 'application/json', if (AppConstants.botApiKey.isNotEmpty) 'X-API-Key': AppConstants.botApiKey},
       body: jsonEncode({'images': imagesBase64}),
     );
     if (response.statusCode == 200) {

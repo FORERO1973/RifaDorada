@@ -10,8 +10,32 @@ class AppConstants {
   static const String countryCode = '+57';
   static const String timezone = 'America/Bogota';
 
-  static const String _defaultChatbotUrl = 'http://192.168.200.107:3008';
+  static const String _defaultChatbotUrl = 'https://squeak-unlocking-absolve.ngrok-free.dev';
   static const String _chatbotUrlKey = 'chatbot_url';
+  static const String _apiKeyKey = 'bot_api_key';
+
+  static String _apiKey = '';
+
+  static String get botApiKey => _apiKey;
+
+  static Future<void> loadBotApiKey() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      _apiKey = prefs.getString(_apiKeyKey) ?? '';
+    } catch (e) {
+      _apiKey = '';
+    }
+  }
+
+  static Future<void> setBotApiKey(String key) async {
+    _apiKey = key;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_apiKeyKey, key);
+    } catch (e) {
+      debugPrint('Error saving bot API key: $e');
+    }
+  }
 
   static String _chatbotUrl = _defaultChatbotUrl;
 

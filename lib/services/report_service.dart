@@ -8,6 +8,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:intl/intl.dart';
 import '../models/rifa.dart';
 import '../models/participante.dart';
+import '../utils/web_helper.dart';
 
 class ReportService {
   static final ReportService instance = ReportService._();
@@ -437,15 +438,20 @@ class ReportService {
 
   Future<void> _share(Uint8List bytes, String rifaNombre) async {
     try {
-      final dir = await getTemporaryDirectory();
       final dateStr = DateFormat('yyyyMMdd_HHmm').format(DateTime.now());
       final name = 'Reporte_${rifaNombre.replaceAll(' ', '_')}_$dateStr.pdf';
-      final file = File('${dir.path}/$name');
-      await file.writeAsBytes(bytes);
-      await Share.shareXFiles(
-        [XFile(file.path, mimeType: 'application/pdf')],
-        subject: 'Reporte de Rifa: $rifaNombre',
-      );
+
+      if (kIsWeb) {
+        downloadBytes(bytes, name);
+      } else {
+        final dir = await getTemporaryDirectory();
+        final file = File('${dir.path}/$name');
+        await file.writeAsBytes(bytes);
+        await Share.shareXFiles(
+          [XFile(file.path, mimeType: 'application/pdf')],
+          subject: 'Reporte de Rifa: $rifaNombre',
+        );
+      }
     } catch (e) {
       debugPrint('[PDF] Error: $e');
       rethrow;

@@ -41,6 +41,8 @@ class _SelectorNumerosViewState extends State<_SelectorNumerosView>
   late AnimationController _pulseController;
   late Animation<double> _pulseAnimation;
   NumberFilter _activeFilter = NumberFilter.all;
+  int _selectedRange = 0;
+  List<Map<String, dynamic>> _ranges = [];
 
   @override
   void initState() {
@@ -58,8 +60,28 @@ class _SelectorNumerosViewState extends State<_SelectorNumerosView>
       final rifa = provider.rifaSeleccionada;
       if (rifa != null) {
         provider.loadNumeros(rifa.id);
+        _buildRanges(rifa);
       }
     });
+  }
+
+  void _buildRanges(Rifa rifa) {
+    final total = rifa.cantidadNumeros;
+    final is3Cifras = rifa.tipoRifa == '3 cifras';
+    if (!is3Cifras || total <= 200) {
+      _ranges = [];
+      return;
+    }
+    final rangeSize = 200;
+    for (int i = 0; i < total; i += rangeSize) {
+      final end = (i + rangeSize - 1).clamp(0, total - 1);
+      _ranges.add({
+        'start': i,
+        'end': end,
+        'label': '${i.toString().padLeft(3, '0')}-${end.toString().padLeft(3, '0')}',
+      });
+    }
+    _selectedRange = 0;
   }
 
   @override
@@ -169,40 +191,86 @@ class _SelectorNumerosViewState extends State<_SelectorNumerosView>
                     ),
                   ],
                 ),
-                const SizedBox(height: 10),
-                TextField(
-                  controller: _searchController,
-                  keyboardType: TextInputType.number,
-                  onChanged: (value) => setState(() => _searchQuery = value),
-                  style: GoogleFonts.outfit(fontSize: 14),
-                  decoration: InputDecoration(
-                    hintText: 'Buscar número...',
-                    prefixIcon: const Icon(Icons.search_rounded, color: AppTheme.primaryColor),
-                    suffixIcon: _searchQuery.isNotEmpty
-                      ? IconButton(
-                          icon: const Icon(Icons.cancel_rounded),
-                          onPressed: () {
-                            _searchController.clear();
-                            setState(() => _searchQuery = '');
-                          }
-                        )
-                      : null,
-                    filled: true,
-                    fillColor: Colors.black26,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(15),
-                      borderSide: BorderSide.none,
+                const SizedBox(height: 6),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: _searchController,
+                        keyboardType: TextInputType.number,
+                        onChanged: (value) => setState(() => _searchQuery = value),
+                        style: GoogleFonts.outfit(fontSize: 12),
+                        decoration: InputDecoration(
+                          hintText: 'Buscar número...',
+                          prefixIcon: const Icon(Icons.search_rounded, color: AppTheme.primaryColor, size: 16),
+                          suffixIcon: _searchQuery.isNotEmpty
+                            ? IconButton(
+                                icon: const Icon(Icons.cancel_rounded, size: 14),
+                                onPressed: () {
+                                  _searchController.clear();
+                                  setState(() => _searchQuery = '');
+                                }
+                              )
+                            : null,
+                          filled: true,
+                          fillColor: Colors.black26,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                            borderSide: BorderSide.none,
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                          isDense: true,
+                        ),
+                      ),
                     ),
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  ),
+                    const SizedBox(width: 8),
+                    _buildQuickSelectionBar(provider),
+                  ],
                 ),
+                if (_ranges.isNotEmpty) ...[
+                  const SizedBox(height: 6),
+                  SizedBox(
+                    height: 32,
+                    child: ListView.builder(
+                      scrollDirection: Axis.horizontal,
+                      itemCount: _ranges.length,
+                      itemBuilder: (context, index) {
+                        final range = _ranges[index];
+                        final isSelected = _selectedRange == index;
+                        return Padding(
+                          padding: const EdgeInsets.only(right: 6),
+                          child: GestureDetector(
+                            onTap: () => setState(() => _selectedRange = index),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: isSelected ? AppTheme.primaryColor : AppTheme.cardColor,
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: isSelected ? AppTheme.primaryColor : AppTheme.dividerColor),
+                              ),
+                              child: Text(
+                                range['label'] as String,
+                                style: GoogleFonts.outfit(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w700,
+                                  color: isSelected ? AppTheme.backgroundColor : AppTheme.textSecondary,
+                                ),
+                              ),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 4),
               ],
             ),
           ),
           Expanded(
             child: RepaintBoundary(
               child: GridView.builder(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                padding: const EdgeInsets.only(left: 16, right: 16, top: 4, bottom: 10),
                 addAutomaticKeepAlives: false,
                 addRepaintBoundaries: true,
                 gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
@@ -211,9 +279,12 @@ class _SelectorNumerosViewState extends State<_SelectorNumerosView>
                   mainAxisSpacing: 6,
                   childAspectRatio: 1,
                 ),
-                itemCount: rifa.cantidadNumeros,
+                itemCount: _ranges.isEmpty
+                    ? rifa.cantidadNumeros
+                    : (_ranges[_selectedRange]['end'] as int) - (_ranges[_selectedRange]['start'] as int) + 1,
                 itemBuilder: (context, index) {
-                  final numero = index.toString().padLeft(
+                  final rangeOffset = _ranges.isEmpty ? 0 : (_ranges[_selectedRange]['start'] as int);
+                  final numero = (rangeOffset + index).toString().padLeft(
                     rifa.tipoRifa == '3 cifras' ? 3 : 2,
                     '0',
                   );
@@ -246,14 +317,14 @@ class _SelectorNumerosViewState extends State<_SelectorNumerosView>
                     textColor = Colors.white;
                   } else if (isPaid) {
                     backgroundColor = AppTheme.numeroPagado;
-                    textColor = Colors.white;
+                    textColor = AppTheme.numeroPagadoText;
                   } else if (isReserved) {
                     backgroundColor = AppTheme.numeroReservado;
-                    textColor = AppTheme.backgroundColor;
+                    textColor = AppTheme.numeroReservadoText;
                   } else {
-                    backgroundColor = AppTheme.surfaceColor;
+                    backgroundColor = AppTheme.numeroDisponible;
                     textColor = AppTheme.textPrimary.withValues(alpha: 0.7);
-                    border = Border.all(color: AppTheme.dividerColor);
+                    border = Border.all(color: AppTheme.numeroDisponibleBorder);
                   }
 
                   return RepaintBoundary(
@@ -407,23 +478,87 @@ class _SelectorNumerosViewState extends State<_SelectorNumerosView>
     String value,
     String label,
   ) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
+    return Column(
       children: [
-        Icon(icon, color: AppTheme.primaryColor, size: 16),
-        const SizedBox(width: 6),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        Row(
+          mainAxisSize: MainAxisSize.min,
           children: [
+            Icon(icon, size: 16, color: AppTheme.primaryColor),
+            const SizedBox(width: 4),
             Text(
               value,
-              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppTheme.textPrimary),
+              style: GoogleFonts.outfit(
+                fontWeight: FontWeight.bold,
+                fontSize: 14,
+                color: AppTheme.textPrimary,
+              ),
             ),
-            Text(label, style: const TextStyle(fontSize: 9, color: AppTheme.textSecondary)),
           ],
+        ),
+        Text(
+          label,
+          style: GoogleFonts.outfit(
+            fontSize: 10,
+            color: AppTheme.textSecondary,
+          ),
         ),
       ],
     );
+  }
+
+  Widget _buildQuickSelectionBar(RifaProvider provider) {
+    final rifa = provider.rifaSeleccionada;
+    if (rifa == null) return const SizedBox.shrink();
+
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        _buildQuickBtn('+1', () => _selectRandomNumbers(provider, 1)),
+        const SizedBox(width: 6),
+        _buildQuickBtn('+5', () => _selectRandomNumbers(provider, 5)),
+        const SizedBox(width: 6),
+        _buildQuickBtn('+10', () => _selectRandomNumbers(provider, 10)),
+      ],
+    );
+  }
+
+  Widget _buildQuickBtn(String label, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [AppTheme.primaryColor.withValues(alpha: 0.15), AppTheme.primaryColor.withValues(alpha: 0.05)],
+          ),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: AppTheme.primaryColor.withValues(alpha: 0.3)),
+        ),
+        child: Text(
+          label,
+          style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.w700, color: AppTheme.primaryColor),
+        ),
+      ),
+    );
+  }
+
+  void _selectRandomNumbers(RifaProvider provider, int count) {
+    final rifa = provider.rifaSeleccionada;
+    if (rifa == null) return;
+
+    final available = <String>[];
+    for (int i = 0; i < rifa.cantidadNumeros; i++) {
+      final num = i.toString().padLeft(rifa.tipoRifa == '3 cifras' ? 3 : 2, '0');
+      if (provider.isNumeroDisponible(num) && !provider.isNumeroSeleccionado(num)) {
+        available.add(num);
+      }
+    }
+
+    available.shuffle();
+    final toSelect = available.take(count).toList();
+    for (final num in toSelect) {
+      provider.toggleNumeroSeleccion(num);
+    }
   }
 
   Widget _buildInteractiveLegend() {
@@ -437,7 +572,7 @@ class _SelectorNumerosViewState extends State<_SelectorNumerosView>
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
           _buildFilterChip('Todos', NumberFilter.all, AppTheme.textPrimary, border: true),
-          _buildFilterChip('Libre', NumberFilter.available, AppTheme.surfaceColor, border: true),
+          _buildFilterChip('Libre', NumberFilter.available, AppTheme.primaryColor, border: true),
           _buildFilterChip('Reservado', NumberFilter.reserved, AppTheme.numeroReservado),
           _buildFilterChip('Pagado', NumberFilter.paid, AppTheme.numeroPagado),
           _buildFilterChip('Selección', NumberFilter.selected, AppTheme.numeroSeleccionado),
@@ -475,7 +610,7 @@ class _SelectorNumerosViewState extends State<_SelectorNumerosView>
 
   Widget _buildImageCarousel(Rifa rifa) {
     return SizedBox(
-      height: 180,
+      height: 140,
       width: double.infinity,
       child: Stack(
         children: [

@@ -8,6 +8,7 @@ import '../models/rifa.dart';
 import '../models/participante.dart';
 import '../models/numero.dart';
 import '../services/firebase_service.dart';
+import '../utils/web_helper.dart';
 
 class RifaProvider extends ChangeNotifier {
   final FirebaseService _firebaseService = FirebaseService.instance;
@@ -244,6 +245,7 @@ class RifaProvider extends ChangeNotifier {
     required String whatsapp,
     required String ciudad,
     String? documento,
+    String? creadoPorNombre,
   }) async {
     if (_rifaSeleccionada == null) {
       throw Exception('No hay rifa seleccionada');
@@ -267,16 +269,11 @@ class RifaProvider extends ChangeNotifier {
         botNotified: false,
         organizacionId: _organizacionId,
         creadoPor: _userId,
+        creadoPorNombre: creadoPorNombre ?? (_esAdmin ? 'Admin' : ''),
         vendedorId: _esAdmin ? null : _userId,
       );
 
       final id = await _firebaseService.registrarParticipante(participante);
-
-      await _firebaseService.reservarNumeros(
-        _rifaSeleccionada!.id,
-        _numerosSeleccionados.toList(),
-        id,
-      );
 
       await loadNumeros(_rifaSeleccionada!.id);
       clearSeleccion();
@@ -595,19 +592,24 @@ Map<String, dynamic> getEstadisticas() {
         return;
       }
 
-      final directory = await getTemporaryDirectory();
       final dateStr = DateFormat('yyyyMMdd_HHmm').format(DateTime.now());
       final vName = vendedorNombre != null ? '_${vendedorNombre.replaceAll(' ', '_')}' : '';
       final fileName = 'Reporte_${rName.replaceAll(' ', '_')}${vName}_$dateStr.csv';
-      final filePath = '${directory.path}/$fileName';
-      
-      final file = File(filePath);
-      await file.writeAsString(csvContent, encoding: utf8);
 
-      await Share.shareXFiles(
-        [XFile(filePath, mimeType: 'text/csv')],
-        subject: 'Reporte de Rifa: $rName',
-      );
+      if (kIsWeb) {
+        final bytes = Uint8List.fromList(utf8.encode(csvContent));
+        downloadBytes(bytes, fileName);
+      } else {
+        final directory = await getTemporaryDirectory();
+        final filePath = '${directory.path}/$fileName';
+        final file = File(filePath);
+        await file.writeAsString(csvContent, encoding: utf8);
+
+        await Share.shareXFiles(
+          [XFile(filePath, mimeType: 'text/csv')],
+          subject: 'Reporte de Rifa: $rName',
+        );
+      }
     } catch (e) {
       _error = 'Error crítico al exportar: $e';
       debugPrint(_error);

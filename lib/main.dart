@@ -15,6 +15,7 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await initializeDateFormatting('es', null);
   await AppConstants.loadChatbotUrl();
+  await AppConstants.loadBotApiKey();
 
   try {
     await Firebase.initializeApp(

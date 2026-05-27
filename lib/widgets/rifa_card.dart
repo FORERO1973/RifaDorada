@@ -8,6 +8,7 @@ import 'package:intl/intl.dart';
 import '../config/theme.dart';
 import '../config/constants.dart';
 import '../models/rifa.dart';
+import '../services/firebase_service.dart';
 
 class RifaCard extends StatefulWidget {
   final Rifa rifa;
@@ -550,51 +551,108 @@ class _RifaCardState extends State<RifaCard> with SingleTickerProviderStateMixin
   }
 
   Widget _buildFooter(BuildContext context) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(
-              'VALOR DEL NÚMERO',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                letterSpacing: 1,
-                fontWeight: FontWeight.w800,
-                color: AppTheme.textSecondary.withValues(alpha: 0.6),
-              ),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'VALOR DEL NÚMERO',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    letterSpacing: 1,
+                    fontWeight: FontWeight.w800,
+                    color: AppTheme.textSecondary.withValues(alpha: 0.6),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  AppConstants.formatCurrencyCOP(widget.rifa.precioNumero),
+                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                    color: AppTheme.primaryColor,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: 4),
-            Text(
-              AppConstants.formatCurrencyCOP(widget.rifa.precioNumero),
-              style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                color: AppTheme.primaryColor,
-                fontWeight: FontWeight.w900,
+            Container(
+              width: 56,
+              height: 56,
+              decoration: BoxDecoration(
+                gradient: AppTheme.goldGradient,
+                borderRadius: BorderRadius.circular(18),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppTheme.primaryColor.withValues(alpha: 0.3),
+                    blurRadius: 12,
+                    offset: const Offset(0, 6),
+                  ),
+                ],
+              ),
+              child: const Icon(
+                Icons.chevron_right_rounded,
+                color: AppTheme.backgroundColor,
+                size: 32,
               ),
             ),
           ],
         ),
-        Container(
-          width: 56,
-          height: 56,
-          decoration: BoxDecoration(
-            gradient: AppTheme.goldGradient,
-            borderRadius: BorderRadius.circular(18),
-            boxShadow: [
-              BoxShadow(
-                color: AppTheme.primaryColor.withValues(alpha: 0.3),
-                blurRadius: 12,
-                offset: const Offset(0, 6),
-              ),
-            ],
-          ),
-          child: const Icon(
-            Icons.chevron_right_rounded,
-            color: AppTheme.backgroundColor,
-            size: 32,
-          ),
-        ),
+        const SizedBox(height: 16),
+        _buildProgressBar(),
       ],
+    );
+  }
+
+  Widget _buildProgressBar() {
+    return FutureBuilder<Map<String, dynamic>>(
+      future: Future.value(FirebaseService.instance.getEstadisticas(widget.rifa.id, widget.rifa.precioNumero)),
+      builder: (context, snapshot) {
+        final vendidos = snapshot.data?['totalVendidos'] as int? ?? 0;
+        final total = widget.rifa.cantidadNumeros;
+        final progreso = total > 0 ? vendidos / total : 0.0;
+        final porcentaje = (progreso * 100).toInt();
+
+        Color progressColor;
+        if (progreso > 0.8) {
+          progressColor = AppTheme.secondaryColor;
+        } else if (progreso > 0.5) {
+          progressColor = AppTheme.primaryColor;
+        } else {
+          progressColor = AppTheme.primaryDark;
+        }
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  '$vendidos/$total vendidos',
+                  style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.w600, color: AppTheme.textSecondary),
+                ),
+                Text(
+                  '$porcentaje%',
+                  style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.w900, color: progressColor),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(4),
+              child: LinearProgressIndicator(
+                value: progreso.clamp(0.0, 1.0),
+                minHeight: 6,
+                backgroundColor: AppTheme.dividerColor.withValues(alpha: 0.3),
+                valueColor: AlwaysStoppedAnimation<Color>(progressColor),
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 

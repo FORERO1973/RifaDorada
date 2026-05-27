@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:screenshot/screenshot.dart';
 import 'package:share_plus/share_plus.dart';
@@ -35,13 +36,14 @@ class _ImagenEstadoScreenState extends State<ImagenEstadoScreen> {
   @override
   void initState() {
     super.initState();
-    if (widget.autoUpload) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        final provider = context.read<RifaProvider>();
-        final rifa = provider.rifaSeleccionada;
-        if (rifa != null) _uploadToBot(rifa);
-      });
-    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final provider = context.read<RifaProvider>();
+      final rifa = provider.rifaSeleccionada;
+      if (rifa != null) {
+        provider.loadNumeros(rifa.id);
+        if (widget.autoUpload) _uploadToBot(rifa);
+      }
+    });
   }
 
   Future<void> _uploadToBot(Rifa rifa) async {
@@ -63,7 +65,7 @@ class _ImagenEstadoScreenState extends State<ImagenEstadoScreen> {
       final url = Uri.parse('${AppConstants.chatbotApi}/status-image');
       final response = await http.post(
         url,
-        headers: {'Content-Type': 'application/json'},
+        headers: {'Content-Type': 'application/json', if (AppConstants.botApiKey.isNotEmpty) 'X-API-Key': AppConstants.botApiKey},
         body: jsonEncode({
           'rifaId': rifa.id,
           'imageBase64': base64,
@@ -206,48 +208,45 @@ class _ImagenEstadoScreenState extends State<ImagenEstadoScreen> {
                   children: [
                     Text(
                       rifa.nombre,
-                      style: Theme.of(context).textTheme.titleMedium,
+                      style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: AppTheme.textPrimary),
                       textAlign: TextAlign.center,
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 2),
                     Text(
                       AppConstants.formatCurrencyCOP(rifa.precioNumero),
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        color: AppTheme.primaryColor,
-                        fontWeight: FontWeight.w900,
-                      ),
+                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: AppTheme.primaryColor),
                     ),
-                    if (rifa.infoLoterias.isNotEmpty) ...[
-                      const SizedBox(height: 4),
-                      Text(
-                        rifa.infoLoterias,
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: AppTheme.textSecondary,
-                        ),
+                    if (rifa.infoLoterias.isNotEmpty || rifa.fechaSorteo != null) ...[
+                      const SizedBox(height: 2),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          if (rifa.infoLoterias.isNotEmpty)
+                            Text(
+                              rifa.infoLoterias,
+                              style: TextStyle(fontSize: 10, color: AppTheme.textSecondary),
+                            ),
+                          if (rifa.infoLoterias.isNotEmpty && rifa.fechaSorteo != null)
+                            Text(' · ', style: TextStyle(fontSize: 10, color: AppTheme.textSecondary)),
+                          if (rifa.fechaSorteo != null)
+                            Text(
+                              'Sorteo: ${DateFormat('dd/MM/yy').format(rifa.fechaSorteo!)}',
+                              style: TextStyle(fontSize: 10, color: AppTheme.textSecondary),
+                            ),
+                        ],
                       ),
                     ],
-                    const SizedBox(height: 8),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        _buildLegendItem('Disponible', AppTheme.numeroDisponible),
-                        const SizedBox(width: 6),
-                        _buildLegendItem('Reservado', AppTheme.numeroReservado),
-                        const SizedBox(width: 6),
-                        _buildLegendItem('Pagado', AppTheme.numeroPagado),
-                      ],
-                    ),
                   ],
                 ),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 8),
               GridView.builder(
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
                 gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                   crossAxisCount: rifa.tipoRifa == '3 cifras' ? 8 : 10,
-                  crossAxisSpacing: 4,
-                  mainAxisSpacing: 4,
+                  crossAxisSpacing: 3,
+                  mainAxisSpacing: 3,
                   childAspectRatio: 1,
                 ),
                 itemCount: rifa.cantidadNumeros,
@@ -267,7 +266,7 @@ class _ImagenEstadoScreenState extends State<ImagenEstadoScreen> {
                   } else if (isReserved) {
                     backgroundColor = AppTheme.numeroReservado;
                   } else {
-                    backgroundColor = Colors.green.shade900.withValues(alpha: 0.8);
+                    backgroundColor = AppTheme.numeroDisponible;
                   }
 
                   return Container(
@@ -280,13 +279,24 @@ class _ImagenEstadoScreenState extends State<ImagenEstadoScreen> {
                     child: Text(
                       numero,
                       style: TextStyle(
-                        fontSize: rifa.tipoRifa == '3 cifras' ? 8 : 10,
+                        fontSize: rifa.tipoRifa == '3 cifras' ? 7 : 9,
                         fontWeight: FontWeight.w900,
                         color: isReserved ? AppTheme.backgroundColor : Colors.white,
                       ),
                     ),
                   );
                 },
+              ),
+              const SizedBox(height: 8),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  _buildLegendItem('Disponible', AppTheme.numeroDisponible),
+                  const SizedBox(width: 8),
+                  _buildLegendItem('Reservado', AppTheme.numeroReservado),
+                  const SizedBox(width: 8),
+                  _buildLegendItem('Pagado', AppTheme.numeroPagado),
+                ],
               ),
             ],
           ),
@@ -299,9 +309,9 @@ class _ImagenEstadoScreenState extends State<ImagenEstadoScreen> {
   Widget _buildPrizeImages(List<String> imagenes) {
     final images = imagenes.take(2).toList();
     return SizedBox(
-      height: 160,
+      height: 120,
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(12),
         child: images.length == 1
             ? _buildImageWidget(images[0])
             : Row(
@@ -333,15 +343,15 @@ class _ImagenEstadoScreenState extends State<ImagenEstadoScreen> {
     return Row(
       children: [
         Container(
-          width: 16,
-          height: 16,
+          width: 12,
+          height: 12,
           decoration: BoxDecoration(
             color: color,
-            borderRadius: BorderRadius.circular(4),
+            borderRadius: BorderRadius.circular(3),
           ),
         ),
-        const SizedBox(width: 4),
-        Text(label, style: const TextStyle(fontSize: 12)),
+        const SizedBox(width: 3),
+        Text(label, style: TextStyle(fontSize: 10, color: AppTheme.textSecondary)),
       ],
     );
   }

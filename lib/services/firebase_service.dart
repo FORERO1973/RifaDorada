@@ -10,6 +10,11 @@ import '../models/numero.dart';
 import '../models/app_config.dart';
 import '../config/constants.dart';
 
+Map<String, String> _botHeaders() => {
+  'Content-Type': 'application/json',
+  if (AppConstants.botApiKey.isNotEmpty) 'X-API-Key': AppConstants.botApiKey,
+};
+
 class FirebaseService {
   static FirebaseService? _instance;
   FirebaseFirestore? _firestore;
@@ -186,6 +191,23 @@ class FirebaseService {
     }
     
     await _firestore!.collection('rifas').doc(id).set(rifa.toMap());
+
+    // Pre-create all number documents so the subcollection is fully populated.
+    // This prevents race conditions where concurrent transactions could both
+    // create the same number document (Firestore read-before-write gap).
+    final batch = _firestore!.batch();
+    final digitos = rifa.tipoRifa == '3 cifras' ? 3 : 2;
+    for (int i = 0; i < rifa.cantidadNumeros; i++) {
+      final numStr = i.toString().padLeft(digitos, '0');
+      final numRef = _firestore!.collection('rifas').doc(id).collection('numeros').doc(numStr);
+      batch.set(numRef, {
+        'estado': 'disponible',
+        'participanteId': '',
+        'rifaId': id,
+      });
+    }
+    await batch.commit();
+
     _syncRifasToChatbot();
     return id;
   }
@@ -281,6 +303,17 @@ class FirebaseService {
     final id = _generateId();
     
     if (_useLocalData) {
+      // Check local numbers first to prevent race condition/double reservation
+      for (final num in participante.numeros) {
+        if (_localNumeros[participante.rifaId] != null &&
+            _localNumeros[participante.rifaId]!.containsKey(num)) {
+          final numObj = _localNumeros[participante.rifaId]![num]!;
+          if (numObj.estaOcupado) {
+            throw Exception('El número $num ya se encuentra ocupado.');
+          }
+        }
+      }
+
       final nuevoParticipante = participante.copyWith(id: id);
       _localParticipantes[participante.rifaId] ??= [];
       _localParticipantes[participante.rifaId]!.insert(0, nuevoParticipante);
@@ -301,11 +334,54 @@ class FirebaseService {
       return id;
     }
     
-    await _firestore!.collection('participantes').doc(id).set(participante.toMap());
+    final participanteConId = participante.copyWith(id: id);
+
+    // Atomic transaction for Firestore
+    await _firestore!.runTransaction((transaction) async {
+      // 1. Read and check all requested numbers
+      for (final num in participante.numeros) {
+        final docRef = _firestore!
+            .collection('rifas')
+            .doc(participante.rifaId)
+            .collection('numeros')
+            .doc(num);
+        
+        final docSnapshot = await transaction.get(docRef);
+        if (docSnapshot.exists) {
+          final data = docSnapshot.data();
+          final estado = data?['estado'] as String?;
+          if (estado == 'reservado' || estado == 'pagado' || estado == 'ocupado') {
+            throw Exception('El número $num ya se encuentra ocupado por otra compra simultánea.');
+          }
+        }
+      }
+
+      // 2. Set participant document
+      final partRef = _firestore!.collection('participantes').doc(id);
+      transaction.set(partRef, participanteConId.toMap());
+
+      // 3. Update the state of all requested numbers
+      for (final num in participante.numeros) {
+        final docRef = _firestore!
+            .collection('rifas')
+            .doc(participante.rifaId)
+            .collection('numeros')
+            .doc(num);
+        
+        transaction.set(docRef, {
+          'estado': participante.estadoPago == EstadoPago.pagado ? 'pagado' : 'reservado',
+          'participanteId': id,
+          'rifaId': participante.rifaId,
+        });
+      }
+    });
+
+    // Sync and notify outside the transaction block
     _syncParticipantesToChatbot(participante.rifaId);
     final rifa = await getRifa(participante.rifaId);
     final total = rifa != null ? rifa.precioNumero * participante.numeros.length : 0.0;
-    _notifySaleToChatbot(participante.rifaId, participante.numeros, participante, total);
+    _notifySaleToChatbot(participante.rifaId, participante.numeros, participanteConId, total);
+    
     return id;
   }
 
@@ -360,12 +436,47 @@ class FirebaseService {
     if (_useLocalData) {
       return _localNumeros[rifaId] ?? {};
     }
-    
+
     final snapshot = await _firestore!.collection('rifas').doc(rifaId).collection('numeros').get();
     final Map<String, Numero> numeros = {};
     for (final doc in snapshot.docs) {
       numeros[doc.id] = Numero.fromMap(doc.data(), doc.id);
     }
+
+    // Reconcile: ensure numbers referenced by participants exist in the subcollection.
+    // This fixes data from before numbers were pre-created on rifa creation.
+    final participantes = await _firestore!
+        .collection('participantes')
+        .where('rifaId', isEqualTo: rifaId)
+        .get();
+    bool needsRepair = false;
+    final batch = _firestore!.batch();
+    for (final doc in participantes.docs) {
+      final data = doc.data();
+      final nums = data['numeros'] as List? ?? [];
+      for (final num in nums) {
+        final numStr = num.toString();
+        if (!numeros.containsKey(numStr)) {
+          needsRepair = true;
+          final numRef = _firestore!.collection('rifas').doc(rifaId).collection('numeros').doc(numStr);
+          batch.set(numRef, {
+            'estado': 'reservado',
+            'participanteId': doc.id,
+            'rifaId': rifaId,
+          });
+          numeros[numStr] = Numero(
+            numero: numStr,
+            estado: EstadoNumero.reservado,
+            participanteId: doc.id,
+            rifaId: rifaId,
+          );
+        }
+      }
+    }
+    if (needsRepair) {
+      await batch.commit();
+    }
+
     return numeros;
   }
 
@@ -465,9 +576,13 @@ class FirebaseService {
           final data = doc.data() as Map<String, dynamic>?;
           if (data == null) continue;
           final estado = data['estado'] as String?;
-          if (estado == 'pagado') pagados++;
-          else if (estado == 'reservado') reservados++;
-          else disponibles++;
+          if (estado == 'pagado') {
+            pagados++;
+          } else if (estado == 'reservado') {
+            reservados++;
+          } else {
+            disponibles++;
+          }
         }
       } catch (_) {}
 
@@ -524,44 +639,114 @@ class FirebaseService {
     if (_useLocalData) return {};
     try {
       Query query = _firestore!
-          .collection('participantes')
-          .where('vendedorId', isGreaterThan: '');
+          .collection('participantes');
       if (rifaId != null) {
         query = query.where('rifaId', isEqualTo: rifaId);
       }
       final snapshot = await query.get();
 
-      final Map<String, Map<String, dynamic>> vendedores = {};
+      // Collect unique rifaIds to fetch prices
+      final Set<String> rifaIds = {};
       for (final doc in snapshot.docs) {
         final data = doc.data() as Map<String, dynamic>?;
         if (data == null) continue;
-        final vid = data['vendedorId'] as String?;
-        if (vid == null || vid.isEmpty) continue;
+        final rid = data['rifaId'] as String?;
+        if (rid != null) rifaIds.add(rid);
+      }
+
+      // Fetch rifa prices
+      final Map<String, double> rifaPrices = {};
+      for (final rid in rifaIds) {
+        try {
+          final rifaDoc = await _firestore!.collection('rifas').doc(rid).get();
+          if (rifaDoc.exists) {
+            final rifaData = rifaDoc.data();
+            rifaPrices[rid] = (rifaData?['precioNumero'] as num?)?.toDouble() ?? 0;
+          }
+        } catch (_) {}
+      }
+
+      final Map<String, Map<String, dynamic>> vendedores = {};
+      final Map<String, String> adminUidMap = {};
+      for (final doc in snapshot.docs) {
+        final data = doc.data() as Map<String, dynamic>?;
+        if (data == null) continue;
+        final vid = (data['vendedorId'] as String?)?.isNotEmpty == true ? data['vendedorId'] : 'admin';
+        final creadoPor = data['creadoPor'] as String?;
+        final estadoPago = data['estadoPago'] as String? ?? 'pendiente';
+        final totalPagado = (data['totalPagado'] as num?)?.toDouble() ?? 0;
+        final numCount = (data['numeros'] as List?)?.length ?? 0;
+        final precio = rifaPrices[data['rifaId'] as String?] ?? 0;
+        final valorTotal = numCount * precio;
+        final pendiente = estadoPago == 'pagado' ? 0.0 : valorTotal - totalPagado;
 
         if (!vendedores.containsKey(vid)) {
           vendedores[vid] = {
             'vendedorId': vid,
-            'nombre': data['creadoPorNombre'] ?? vid,
+            'nombre': vid,
             'totalParticipantes': 0,
             'totalRecaudado': 0.0,
             'totalPendiente': 0.0,
             'numerosVendidos': 0,
+            'pagados': 0,
+            'abonados': 0,
+            'pendientes': 0,
           };
+          if (vid == 'admin' && creadoPor != null) {
+            adminUidMap[vid] = creadoPor;
+          }
         }
         vendedores[vid]!['totalParticipantes'] = (vendedores[vid]!['totalParticipantes'] as int) + 1;
-        vendedores[vid]!['totalRecaudado'] = (vendedores[vid]!['totalRecaudado'] as double) + ((data['totalPagado'] as num?)?.toDouble() ?? 0);
-        vendedores[vid]!['numerosVendidos'] = (vendedores[vid]!['numerosVendidos'] as int) + ((data['numeros'] as List?)?.length ?? 0);
+        vendedores[vid]!['totalRecaudado'] = (vendedores[vid]!['totalRecaudado'] as double) + totalPagado;
+        vendedores[vid]!['totalPendiente'] = (vendedores[vid]!['totalPendiente'] as double) + pendiente;
+        vendedores[vid]!['numerosVendidos'] = (vendedores[vid]!['numerosVendidos'] as int) + numCount;
+
+        if (estadoPago == 'pagado') {
+          vendedores[vid]!['pagados'] = (vendedores[vid]!['pagados'] as int) + 1;
+        } else if (estadoPago == 'abonado') {
+          vendedores[vid]!['abonados'] = (vendedores[vid]!['abonados'] as int) + 1;
+        } else {
+          vendedores[vid]!['pendientes'] = (vendedores[vid]!['pendientes'] as int) + 1;
+        }
+      }
+
+      // Collect all UIDs to fetch: vendedor IDs + admin creadoPor
+      final Set<String> uidsToFetch = {};
+      for (final vid in vendedores.keys) {
+        if (vid == 'admin') {
+          final adminUid = adminUidMap['admin'];
+          if (adminUid != null) uidsToFetch.add(adminUid);
+        } else {
+          uidsToFetch.add(vid);
+        }
       }
 
       // Fetch user names
-      for (final vid in vendedores.keys.toList()) {
+      final Map<String, String> uidToName = {};
+      for (final uid in uidsToFetch) {
         try {
-          final userDoc = await _firestore!.collection('users').doc(vid).get();
+          final userDoc = await _firestore!.collection('users').doc(uid).get();
           if (userDoc.exists) {
             final userData = userDoc.data();
-            vendedores[vid]!['nombre'] = userData?['nombre'] ?? vid;
+            final userName = userData?['nombre'] as String?;
+            if (userName != null) uidToName[uid] = userName;
           }
         } catch (_) {}
+      }
+
+      // Apply resolved names
+      for (final entry in vendedores.entries) {
+        final vid = entry.key;
+        if (vid == 'admin') {
+          final adminUid = adminUidMap['admin'];
+          if (adminUid != null && uidToName.containsKey(adminUid)) {
+            entry.value['nombre'] = uidToName[adminUid]!;
+          } else {
+            entry.value['nombre'] = 'Admin';
+          }
+        } else if (uidToName.containsKey(vid)) {
+          entry.value['nombre'] = uidToName[vid]!;
+        }
       }
 
       return {'vendedores': vendedores.values.toList()};
@@ -583,10 +768,25 @@ class FirebaseService {
       for (final doc in snapshot.docs) {
         final data = doc.data() as Map<String, dynamic>?;
         if (data == null) continue;
+
+        final estadoPago = data['estadoPago'] as String?;
+        if (estadoPago == 'pagado' || estadoPago == 'abonado') {
+          final metodo = data['metodoPago'] as String? ?? 'efectivo';
+          methods[metodo] = (methods[metodo] ?? 0) + 1;
+        }
+
         final abonos = data['abonos'];
-        if (abonos is List) {
+        if (abonos is Map) {
+          for (final abonoEntry in abonos.entries) {
+            final abono = abonoEntry.value as Map?;
+            if (abono != null) {
+              final metodo = abono['metodoPago'] as String? ?? 'efectivo';
+              methods[metodo] = (methods[metodo] ?? 0) + 1;
+            }
+          }
+        } else if (abonos is List) {
           for (final abono in abonos) {
-            final metodo = (abono as Map)['metodoPago'] as String? ?? 'otro';
+            final metodo = (abono as Map)['metodoPago'] as String? ?? 'efectivo';
             methods[metodo] = (methods[metodo] ?? 0) + 1;
           }
         }
@@ -611,10 +811,25 @@ class FirebaseService {
           for (final doc in snapshot.docs) {
             final data = doc.data() as Map<String, dynamic>?;
             if (data == null) continue;
+
+            final estadoPago = data['estadoPago'] as String?;
+            if (estadoPago == 'pagado' || estadoPago == 'abonado') {
+              final metodo = data['metodoPago'] as String? ?? 'efectivo';
+              methods[metodo] = (methods[metodo] ?? 0) + 1;
+            }
+
             final abonos = data['abonos'];
-            if (abonos is List) {
+            if (abonos is Map) {
+              for (final abonoEntry in abonos.entries) {
+                final abono = abonoEntry.value as Map?;
+                if (abono != null) {
+                  final metodo = abono['metodoPago'] as String? ?? 'efectivo';
+                  methods[metodo] = (methods[metodo] ?? 0) + 1;
+                }
+              }
+            } else if (abonos is List) {
               for (final abono in abonos) {
-                final metodo = (abono as Map)['metodoPago'] as String? ?? 'otro';
+                final metodo = (abono as Map)['metodoPago'] as String? ?? 'efectivo';
                 methods[metodo] = (methods[metodo] ?? 0) + 1;
               }
             }
@@ -723,8 +938,15 @@ class FirebaseService {
       final fecha = DateFormat('dd/MM/yyyy HH:mm').format(p.fechaRegistro);
       final abonosCount = p.abonos.length;
       
+      String sanitize(dynamic v) {
+        final s = v.toString();
+        if (s.startsWith('=') || s.startsWith('+') || s.startsWith('-') || s.startsWith('@') || s.startsWith('|')) {
+          return "'$s";
+        }
+        return s;
+      }
       buffer.writeln(
-        '"${p.nombre}","${p.whatsapp}","${p.ciudad}","${p.documento ?? ''}","${p.numerosString}","$estado","${p.totalPagado.toStringAsFixed(0)}","${totalValor.toStringAsFixed(0)}","$abonosCount","$fecha"'
+        '"${sanitize(p.nombre)}","${sanitize(p.whatsapp)}","${sanitize(p.ciudad)}","${sanitize(p.documento ?? '')}","${sanitize(p.numerosString)}","$estado","${p.totalPagado.toStringAsFixed(0)}","${totalValor.toStringAsFixed(0)}","$abonosCount","$fecha"'
       );
     }
     
@@ -746,9 +968,7 @@ class FirebaseService {
           'description': data['descripcion'] ?? '',
           'ticketPrice': (data['precioNumero'] ?? 0).toDouble(),
           'totalTickets': data['cantidadNumeros'] ?? 0,
-          'deadline': data['fechaSorteo'] != null 
-              ? data['fechaSorteo'] 
-              : null,
+          'deadline': data['fechaSorteo'],
           'active': data['activa'] ?? true,
           'soldTickets': <int>[],
         };
@@ -756,10 +976,9 @@ class FirebaseService {
 
       await http.post(
         Uri.parse('${AppConstants.chatbotApi}/sync/rifas'),
-        headers: {'Content-Type': 'application/json'},
+        headers: _botHeaders(),
         body: jsonEncode({'rifas': rifasData}),
       );
-      debugPrint('[SYNC] Rifas enviadas al chatbot');
     } catch (e) {
       debugPrint('[SYNC] Error enviando rifas al chatbot: $e');
     }
@@ -789,7 +1008,7 @@ class FirebaseService {
 
       await http.post(
         Uri.parse('${AppConstants.chatbotApi}/sync/participantes'),
-        headers: {'Content-Type': 'application/json'},
+        headers: _botHeaders(),
         body: jsonEncode({'participantes': participantesData}),
       );
       debugPrint('[SYNC] Participantes de rifa $rifaId enviados al chatbot');
@@ -815,7 +1034,7 @@ class FirebaseService {
         '🎫 *RIFADORADA — TICKET*',
         '━━━━━━━━━━━━━━━━━━━━━━━',
         '🏆 *Rifa:* ${participante.rifaId}',
-        '📅 ${fecha}',
+        '📅 $fecha',
         '',
         '👤 *${participante.nombre}*',
         '📱 ${participante.whatsappFormateado}',
@@ -827,7 +1046,7 @@ class FirebaseService {
         '*Total:* \$${total.toStringAsFixed(0)} COP',
         '*Pagado:* \$${participante.totalPagado.toStringAsFixed(0)} COP',
         if (restante > 0) '*Restante:* \$${restante.toStringAsFixed(0)} COP',
-        '*Estado:* ${estadoIcono} ${estadoTexto}',
+        '*Estado:* $estadoIcono $estadoTexto',
         '',
         '━━ 📌 ━━',
         '1. Transfiere a $labelCuenta',
@@ -841,7 +1060,7 @@ class FirebaseService {
 
       await http.post(
         Uri.parse('${AppConstants.chatbotApi}/send/wa'),
-        headers: {'Content-Type': 'application/json'},
+        headers: _botHeaders(),
         body: jsonEncode({
           'number': participante.whatsappFormateado,
           'message': mensajeTicket,
@@ -858,7 +1077,7 @@ class FirebaseService {
     try {
       final response = await http.post(
         Uri.parse('${AppConstants.chatbotApi}/messages'),
-        headers: {'Content-Type': 'application/json'},
+        headers: _botHeaders(),
         body: jsonEncode({
           'number': whatsapp,
           'message': message,
@@ -892,7 +1111,7 @@ class FirebaseService {
     try {
       await http.post(
         Uri.parse('${AppConstants.chatbotApi}/sync/abono'),
-        headers: {'Content-Type': 'application/json'},
+        headers: _botHeaders(),
         body: jsonEncode({
           'whatsapp': whatsapp,
           'rifaId': rifaId,
@@ -957,7 +1176,7 @@ class FirebaseService {
     try {
       await http.post(
         Uri.parse('${AppConstants.chatbotApi}/send/ticket'),
-        headers: {'Content-Type': 'application/json'},
+        headers: _botHeaders(),
         body: jsonEncode({
           'whatsapp': whatsapp,
           'rifaId': rifaId,
@@ -974,7 +1193,7 @@ class FirebaseService {
     try {
       await http.post(
         Uri.parse('${AppConstants.chatbotApi}/send/custom'),
-        headers: {'Content-Type': 'application/json'},
+        headers: _botHeaders(),
         body: jsonEncode({
           'whatsapp': whatsapp,
           'message': mensaje,

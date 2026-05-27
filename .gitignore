@@ -46,3 +46,6 @@ app.*.map.json
 
 # WhatsApp bot uploaded images (runtime data)
 whatsapp_bot/uploads/
+
+# WhatsApp bot environment (contains Firebase admin credentials)
+whatsapp_bot/.env

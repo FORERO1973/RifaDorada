@@ -240,7 +240,7 @@ class _VendedorVentasScreenState extends State<VendedorVentasScreen> {
           ),
           const SizedBox(height: 8),
           DropdownButtonFormField<String>(
-            value: _filterRifaId,
+            initialValue: _filterRifaId,
             decoration: const InputDecoration(
               labelText: 'Filtrar por rifa',
               contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -475,13 +475,16 @@ class _VendedorVentasScreenState extends State<VendedorVentasScreen> {
     );
 
     if (confirm != true) return;
+    if (!context.mounted) return;
 
+    // ignore: use_build_context_synchronously
+    final nav = Navigator.of(context);
     await provider.marcarPago(p.id, true, rifaId: rifa.id, precioNumero: rifa.precioNumero);
 
     if (!context.mounted) return;
     final idx = provider.participantes.indexWhere((x) => x.id == p.id);
     final updated = idx >= 0 ? provider.participantes[idx] : p.copyWith(estadoPago: EstadoPago.pagado, totalPagado: p.numeros.length * rifa.precioNumero);
-    Navigator.push(context, MaterialPageRoute(
+    nav.push(MaterialPageRoute(
       builder: (_) => TicketScreen(participante: updated, rifa: rifa, autoSend: true),
     ));
   }
@@ -540,7 +543,7 @@ class _VendedorVentasScreenState extends State<VendedorVentasScreen> {
                   ),
                   const SizedBox(height: 12),
                   DropdownButtonFormField<String>(
-                    value: metodoPago,
+                    initialValue: metodoPago,
                     decoration: const InputDecoration(
                       labelText: 'Método de pago',
                       border: OutlineInputBorder(),

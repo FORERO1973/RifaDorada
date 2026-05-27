@@ -196,13 +196,17 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                   Navigator.pop(ctx);
                   if (success) {
                     await _loadUsers();
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('✅ Vendedor creado exitosamente'), backgroundColor: AppTheme.secondaryColor),
-                    );
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('✅ Vendedor creado exitosamente'), backgroundColor: AppTheme.secondaryColor),
+                      );
+                    }
                   } else {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('⚠️ Error al crear vendedor'), backgroundColor: Colors.orange),
-                    );
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('⚠️ Error al crear vendedor'), backgroundColor: Colors.orange),
+                      );
+                    }
                   }
                 }
               },

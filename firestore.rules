@@ -1,0 +1,101 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper: check if user is authenticated
+    function isAuth() {
+      return request.auth != null && request.auth.uid != null;
+    }
+
+    // Helper: get user role
+    function getUserRole() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.rol;
+    }
+
+    // Helper: get user's organization id
+    function getUserOrg() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.organizacionId;
+    }
+
+    // Helper: check if user is superAdmin
+    function isSuperAdmin() {
+      return isAuth() && getUserRole() == 'superAdmin';
+    }
+
+    // Helper: check if user is orgAdmin (or superAdmin)
+    function isOrgAdmin() {
+      return isAuth() && (getUserRole() == 'orgAdmin' || getUserRole() == 'superAdmin');
+    }
+
+    // Helper: check if user belongs to the same organization
+    function isSameOrg(orgId) {
+      return isAuth() && getUserOrg() == orgId;
+    }
+
+    // Helper: check if user can manage this organization's data
+    function canManageOrg(orgId) {
+      return isAuth() && (isSuperAdmin() || (isSameOrg(orgId) && (getUserRole() == 'orgAdmin' || getUserRole() == 'vendedor')));
+    }
+
+    // ===== users collection =====
+    match /users/{uid} {
+      // Users can read their own data; superAdmin can read all
+      allow read: if isAuth() && (request.auth.uid == uid || isSuperAdmin());
+      // Users can update their own non-role data; only superAdmin can change roles
+      allow create: if isSuperAdmin();
+      allow update: if (isAuth() && request.auth.uid == uid && request.resource.data.rol == resource.data.rol)
+                    || isSuperAdmin();
+      allow delete: if isSuperAdmin();
+    }
+
+    // ===== organizaciones collection =====
+    match /organizaciones/{orgId} {
+      // superAdmin can read/write all orgs; org members can read their own org
+      allow read: if isSuperAdmin() || (isAuth() && getUserOrg() == orgId);
+      allow create: if isSuperAdmin();
+      allow update, delete: if isSuperAdmin();
+    }
+
+    // ===== rifas collection =====
+    match /rifas/{rifaId} {
+      // superAdmin can read/write all; org members can read/write rifas in their org
+      allow read: if isSuperAdmin() || (isAuth() && canManageOrg(resource.data.organizacionId));
+      allow create: if isOrgAdmin();
+      allow update, delete: if isSuperAdmin() || (isAuth() && getUserRole() == 'orgAdmin' && isSameOrg(resource.data.organizacionId));
+
+      // ===== rifas/{rifaId}/numeros subcollection =====
+      match /numeros/{numero} {
+        allow read: if isSuperAdmin() || (isAuth() && canManageOrg(get(/databases/$(database)/documents/rifas/$(rifaId)).data.organizacionId));
+        allow write: if isSuperAdmin() || (isAuth() && getUserRole() == 'orgAdmin' && isSameOrg(get(/databases/$(database)/documents/rifas/$(rifaId)).data.organizacionId));
+      }
+    }
+
+    // ===== participantes collection =====
+    match /participantes/{participanteId} {
+      // superAdmin can read/write all; org members can read/write participants in their org
+      allow read: if isSuperAdmin() || (isAuth() && canManageOrg(resource.data.organizacionId));
+      // vendedor can create participants; orgAdmin/superAdmin can also create
+      allow create: if isAuth() && (isSuperAdmin() || getUserRole() == 'orgAdmin' || getUserRole() == 'vendedor');
+      // Only orgAdmin and superAdmin can update/delete participants
+      allow update, delete: if isOrgAdmin();
+    }
+
+    // ===== config collection =====
+    match /config/{configId} {
+      allow read: if isAuth();
+      // Only superAdmin can write to config
+      allow write: if isSuperAdmin();
+    }
+
+    // ===== appConfig document =====
+    match /appConfig/{docId} {
+      allow read: if isAuth();
+      allow write: if isSuperAdmin();
+    }
+
+    // Default: deny everything else
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

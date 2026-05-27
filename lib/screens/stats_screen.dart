@@ -123,8 +123,9 @@ class _StatsScreenState extends State<StatsScreen> {
         final abonados = stats['participantesAbonados'] as int? ?? 0;
 
         return Scaffold(
-          body: CustomScrollView(
-            slivers: [
+          body: SafeArea(
+            child: CustomScrollView(
+              slivers: [
               _buildAppBar(context, provider),
               SliverToBoxAdapter(
                 child: Padding(
@@ -152,70 +153,53 @@ class _StatsScreenState extends State<StatsScreen> {
               ),
             ],
           ),
-        );
+        ),
+      );
       },
     );
   }
 
   Widget _buildAppBar(BuildContext context, RifaProvider provider) {
-    return SliverAppBar(
-      expandedHeight: 100,
-      floating: false,
-      pinned: true,
-      backgroundColor: AppTheme.surfaceColor,
-      flexibleSpace: FlexibleSpaceBar(
-        background: Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [AppTheme.primaryColor.withValues(alpha: 0.06), AppTheme.surfaceColor],
-            ),
+    return SliverToBoxAdapter(
+      child: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [AppTheme.primaryColor.withValues(alpha: 0.06), AppTheme.surfaceColor],
           ),
-          child: SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(6),
-                        decoration: BoxDecoration(
-                          color: AppTheme.primaryColor.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: const Icon(Icons.insights_rounded, color: AppTheme.primaryColor, size: 20),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              'Estadísticas',
-                              style: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.w900, color: AppTheme.textPrimary),
-                            ),
-                            Text(
-                              selectedRifa?.nombre ?? 'Todas las rifas',
-                              style: GoogleFonts.outfit(fontSize: 11, color: AppTheme.textSecondary),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ],
-                        ),
-                      ),
-                      _buildRifaSelector(provider),
-                    ],
+          border: Border(bottom: BorderSide(color: AppTheme.dividerColor, width: 0.5)),
+        ),
+        padding: const EdgeInsets.fromLTRB(12, 12, 12, 10),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(5),
+                  decoration: BoxDecoration(
+                    color: AppTheme.primaryColor.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(7),
                   ),
-                  const SizedBox(height: 8),
-                  _buildTimeFilter(),
-                ],
-              ),
+                  child: const Icon(Icons.filter_list_rounded, color: AppTheme.primaryColor, size: 16),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    selectedRifa?.nombre ?? 'Todas las rifas',
+                    style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.textSecondary),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                _buildRifaSelector(provider),
+              ],
             ),
-          ),
+            const SizedBox(height: 8),
+            _buildTimeFilter(),
+          ],
         ),
       ),
     );
@@ -258,59 +242,111 @@ class _StatsScreenState extends State<StatsScreen> {
     );
   }
 
+  static const _globalKey = '__global__';
+
   Widget _buildRifaSelector(RifaProvider provider) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-      decoration: BoxDecoration(
-        color: AppTheme.cardColor,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: AppTheme.dividerColor),
-      ),
-      child: DropdownButtonHideUnderline(
-        child: DropdownButton<String>(
-          value: selectedRifa?.id,
-          dropdownColor: AppTheme.cardColor,
-          icon: const Icon(Icons.arrow_drop_down_rounded, color: AppTheme.primaryColor, size: 20),
-          items: [
-            const DropdownMenuItem(value: null, child: Text('Global', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12))),
-            ...provider.rifas.map((r) => DropdownMenuItem<String>(
-              value: r.id,
-              child: Text(
-                r.nombre.length > 14 ? '${r.nombre.substring(0, 11)}...' : r.nombre,
-                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+    return PopupMenuButton<String>(
+      tooltip: 'Seleccionar rifa',
+      color: AppTheme.cardColor,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      onSelected: (value) {
+        if (value == _globalKey) {
+          setState(() => selectedRifa = null);
+          provider.clearRifaSeleccionada();
+          _refreshGlobalStats(provider);
+          _refreshGlobalPaymentStats(provider);
+          _loadGlobalParticipants(provider);
+          final auth = context.read<AuthProvider>();
+          if (auth.esAdmin) {
+            setState(() => _loadingVendedor = true);
+            provider.getVendedorStats().then((v) {
+              if (mounted) setState(() { _vendedorStats = v; _loadingVendedor = false; });
+            });
+          }
+        } else {
+          final rifa = provider.rifas.firstWhere((r) => r.id == value);
+          setState(() => selectedRifa = rifa);
+          provider.setRifaSeleccionada(rifa);
+          provider.loadParticipantes(rifa.id);
+          provider.loadNumeros(rifa.id);
+          _loadPaymentStats(provider, rifa.id);
+          final auth = context.read<AuthProvider>();
+          if (auth.esAdmin) {
+            setState(() => _loadingVendedor = true);
+            provider.getVendedorStats(rifaId: value).then((v) {
+              if (mounted) setState(() { _vendedorStats = v; _loadingVendedor = false; });
+            });
+          }
+        }
+      },
+      itemBuilder: (context) {
+        final items = <PopupMenuEntry<String>>[];
+        items.add(
+          PopupMenuItem<String>(
+            value: _globalKey,
+            height: 40,
+            child: Row(
+              children: [
+                Icon(Icons.dashboard_rounded, size: 16, color: selectedRifa == null ? AppTheme.primaryColor : AppTheme.textSecondary),
+                const SizedBox(width: 8),
+                Flexible(
+                  child: Text('Global (Todas las rifas)', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12, color: selectedRifa == null ? AppTheme.primaryColor : AppTheme.textPrimary)),
+                ),
+              ],
+            ),
+          ),
+        );
+        if (provider.rifas.isNotEmpty) {
+          items.add(const PopupMenuDivider(height: 1));
+          for (final r in provider.rifas) {
+            items.add(
+              PopupMenuItem<String>(
+                value: r.id,
+                height: 40,
+                child: Row(
+                  children: [
+                    Icon(Icons.confirmation_number_outlined, size: 16, color: selectedRifa?.id == r.id ? AppTheme.primaryColor : AppTheme.textSecondary),
+                    const SizedBox(width: 8),
+                    Flexible(
+                      child: Text(
+                        r.nombre,
+                        style: TextStyle(fontWeight: FontWeight.w600, fontSize: 12, color: selectedRifa?.id == r.id ? AppTheme.primaryColor : AppTheme.textPrimary),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            )),
+            );
+          }
+        }
+        return items;
+      },
+      icon: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: AppTheme.cardColor,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: AppTheme.dividerColor, width: 1.5),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.filter_alt_rounded, size: 14, color: AppTheme.primaryColor),
+            const SizedBox(width: 4),
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 100),
+              child: Text(
+                selectedRifa?.nombre ?? 'Todas',
+                style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.w600, color: AppTheme.textPrimary),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            const SizedBox(width: 4),
+            Icon(Icons.arrow_drop_down_rounded, size: 18, color: AppTheme.primaryColor),
           ],
-          onChanged: (rifaId) {
-            if (rifaId != null) {
-              final rifa = provider.rifas.firstWhere((r) => r.id == rifaId);
-              setState(() => selectedRifa = rifa);
-              provider.setRifaSeleccionada(rifa);
-              provider.loadParticipantes(rifa.id);
-              provider.loadNumeros(rifa.id);
-              _loadPaymentStats(provider, rifa.id);
-              final auth = context.read<AuthProvider>();
-              if (auth.esAdmin) {
-                setState(() => _loadingVendedor = true);
-                provider.getVendedorStats(rifaId: rifaId).then((v) {
-                  if (mounted) setState(() { _vendedorStats = v; _loadingVendedor = false; });
-                });
-              }
-            } else {
-              setState(() => selectedRifa = null);
-              provider.clearRifaSeleccionada();
-              _refreshGlobalStats(provider);
-              _refreshGlobalPaymentStats(provider);
-              _loadGlobalParticipants(provider);
-              final auth = context.read<AuthProvider>();
-              if (auth.esAdmin) {
-                setState(() => _loadingVendedor = true);
-                provider.getVendedorStats().then((v) {
-                  if (mounted) setState(() { _vendedorStats = v; _loadingVendedor = false; });
-                });
-              }
-            }
-          },
         ),
       ),
     );
@@ -335,55 +371,54 @@ class _StatsScreenState extends State<StatsScreen> {
     return Column(
       children: [
         Container(
-          padding: const EdgeInsets.all(14),
+          padding: const EdgeInsets.all(10),
           decoration: BoxDecoration(
             gradient: LinearGradient(
               colors: [AppTheme.primaryColor.withValues(alpha: 0.12), AppTheme.primaryColor.withValues(alpha: 0.04)],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
-            borderRadius: BorderRadius.circular(18),
+            borderRadius: BorderRadius.circular(14),
             border: Border.all(color: AppTheme.primaryColor.withValues(alpha: 0.25)),
           ),
           child: Row(
             children: [
               SizedBox(
-                width: 56,
-                height: 56,
+                width: 44,
+                height: 44,
                 child: Stack(
                   alignment: Alignment.center,
                   children: [
                     CircularProgressIndicator(
                       value: progreso.clamp(0.0, 1.0),
-                      strokeWidth: 6,
+                      strokeWidth: 4,
                       backgroundColor: AppTheme.dividerColor,
                       valueColor: const AlwaysStoppedAnimation<Color>(AppTheme.primaryColor),
                       strokeCap: StrokeCap.round,
                     ),
                     Text(
                       '${(progreso * 100).toInt()}%',
-                      style: GoogleFonts.outfit(fontWeight: FontWeight.w900, fontSize: 13, color: AppTheme.textPrimary),
+                      style: GoogleFonts.outfit(fontWeight: FontWeight.w900, fontSize: 10, color: AppTheme.textPrimary),
                     ),
                   ],
                 ),
               ),
-              const SizedBox(width: 14),
+              const SizedBox(width: 10),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       'PROGRESO DE VENTAS',
-                      style: GoogleFonts.outfit(fontSize: 9, fontWeight: FontWeight.w800, letterSpacing: 1.2, color: AppTheme.primaryColor),
+                      style: GoogleFonts.outfit(fontSize: 8, fontWeight: FontWeight.w800, letterSpacing: 1, color: AppTheme.primaryColor),
                     ),
-                    const SizedBox(height: 2),
                     Text(
                       _formatMoney(totalVendido),
-                      style: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.w900, color: AppTheme.textPrimary),
+                      style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w900, color: AppTheme.textPrimary),
                     ),
                     Text(
                       'de ${_formatMoney(potencialTotal)} · $numerosVendidos/$totalNumeros',
-                      style: GoogleFonts.outfit(fontSize: 10, color: AppTheme.textSecondary),
+                      style: GoogleFonts.outfit(fontSize: 9, color: AppTheme.textSecondary),
                     ),
                   ],
                 ),
@@ -391,14 +426,14 @@ class _StatsScreenState extends State<StatsScreen> {
             ],
           ),
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: 8),
         GridView.count(
           crossAxisCount: 2,
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
           crossAxisSpacing: 8,
           mainAxisSpacing: 8,
-          childAspectRatio: 1.5,
+          childAspectRatio: 2.2,
           children: [
             _buildStatCard('Recaudado', _formatMoney(totalPagado), Icons.payments_rounded,
               LinearGradient(colors: [Colors.green.shade600, Colors.green.shade800])),
@@ -412,12 +447,12 @@ class _StatsScreenState extends State<StatsScreen> {
         ),
         if (abonados > 0)
           Padding(
-            padding: const EdgeInsets.only(top: 8),
+            padding: const EdgeInsets.only(top: 6),
             child: Row(
               children: [
-                Icon(Icons.person_pin_rounded, size: 14, color: Colors.orange),
+                Icon(Icons.person_pin_rounded, size: 12, color: Colors.orange),
                 const SizedBox(width: 4),
-                Text('$abonados con abonos parciales', style: GoogleFonts.outfit(fontSize: 11, color: Colors.orange.shade700, fontWeight: FontWeight.w600)),
+                Text('$abonados con abonos parciales', style: GoogleFonts.outfit(fontSize: 10, color: Colors.orange.shade700, fontWeight: FontWeight.w600)),
               ],
             ),
           ),
@@ -427,40 +462,42 @@ class _StatsScreenState extends State<StatsScreen> {
 
   Widget _buildStatCard(String title, String value, IconData icon, Gradient gradient) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
       decoration: BoxDecoration(
         gradient: gradient,
-        borderRadius: BorderRadius.circular(14),
-        boxShadow: [BoxShadow(color: (gradient.colors.last).withValues(alpha: 0.25), blurRadius: 6, offset: const Offset(0, 2))],
+        borderRadius: BorderRadius.circular(10),
+        boxShadow: [BoxShadow(color: (gradient.colors.last).withValues(alpha: 0.25), blurRadius: 4, offset: const Offset(0, 2))],
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      child: Row(
         children: [
           Container(
-            padding: const EdgeInsets.all(5),
-            decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.2), borderRadius: BorderRadius.circular(8)),
-            child: Icon(icon, color: Colors.white, size: 16),
+            padding: const EdgeInsets.all(4),
+            decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.2), borderRadius: BorderRadius.circular(6)),
+            child: Icon(icon, color: Colors.white, size: 14),
           ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              FittedBox(
-                fit: BoxFit.scaleDown,
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  value,
-                  style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 13, letterSpacing: -0.5),
-                  maxLines: 1,
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    value,
+                    style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 12, letterSpacing: -0.5),
+                    maxLines: 1,
+                  ),
                 ),
-              ),
-              Text(
-                title.toUpperCase(),
-                style: GoogleFonts.outfit(color: Colors.white.withValues(alpha: 0.9), fontWeight: FontWeight.w800, fontSize: 7, letterSpacing: 0.8),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ],
+                Text(
+                  title.toUpperCase(),
+                  style: GoogleFonts.outfit(color: Colors.white.withValues(alpha: 0.9), fontWeight: FontWeight.w800, fontSize: 7, letterSpacing: 0.8),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
           ),
         ],
       ),
@@ -951,41 +988,74 @@ class _StatsScreenState extends State<StatsScreen> {
 
         return _buildChartContainer(
           title: 'Rendimiento por Vendedor',
-          subtitle: '${vendedores.length} vendedores',
+          subtitle: '${vendedores.length} vendedor${vendedores.length == 1 ? '' : 'es'}',
           child: Column(
             children: [
               ...vendedores.map((v) {
                 final vMap = v as Map<String, dynamic>;
-                final nombre = vMap['nombre'] as String? ?? 'Vendedor';
+                final vid = vMap['vendedorId'] as String? ?? '';
+                final nombre = vMap['nombre'] as String? ?? (vid == 'admin' ? 'Admin' : 'Vendedor');
                 final nums = vMap['numerosVendidos'] as int? ?? 0;
                 final ventas = vMap['totalParticipantes'] as int? ?? 0;
                 final recaudado = (vMap['totalRecaudado'] as num?)?.toDouble() ?? 0;
+                final pendiente = (vMap['totalPendiente'] as num?)?.toDouble() ?? 0;
+                final pagados = vMap['pagados'] as int? ?? 0;
+                final abonados = vMap['abonados'] as int? ?? 0;
+                final pendientes = vMap['pendientes'] as int? ?? 0;
+                final esAdmin = vid == 'admin';
 
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 10),
+                return Container(
+                  padding: const EdgeInsets.fromLTRB(8, 8, 10, 8),
+                  margin: const EdgeInsets.only(bottom: 6),
+                  decoration: BoxDecoration(
+                    color: AppTheme.surfaceColor,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: AppTheme.dividerColor.withValues(alpha: 0.3)),
+                  ),
                   child: Row(
                     children: [
                       CircleAvatar(
-                        radius: 16,
-                        backgroundColor: AppTheme.primaryColor.withValues(alpha: 0.15),
-                        child: Text(
-                          nombre.isNotEmpty ? nombre[0].toUpperCase() : '?',
-                          style: GoogleFonts.outfit(fontWeight: FontWeight.bold, color: AppTheme.primaryColor, fontSize: 14),
+                        radius: 14,
+                        backgroundColor: esAdmin ? AppTheme.primaryColor.withValues(alpha: 0.25) : AppTheme.primaryColor.withValues(alpha: 0.15),
+                        child: Icon(
+                          esAdmin ? Icons.admin_panel_settings_rounded : Icons.person_rounded,
+                          color: AppTheme.primaryColor,
+                          size: 16,
                         ),
                       ),
-                      const SizedBox(width: 10),
+                      const SizedBox(width: 8),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(nombre, style: GoogleFonts.outfit(fontWeight: FontWeight.w700, fontSize: 13)),
-                            Text('$nums números · $ventas ventas', style: GoogleFonts.outfit(fontSize: 10, color: AppTheme.textSecondary)),
+                            Text(nombre, style: GoogleFonts.outfit(fontWeight: FontWeight.w700, fontSize: 11)),
+                            const SizedBox(height: 1),
+                            Text('$nums nums · $ventas ventas', style: GoogleFonts.outfit(fontSize: 9, color: AppTheme.textSecondary)),
+                            const SizedBox(height: 3),
+                            Row(
+                              children: [
+                                if (pagados > 0)
+                                  _estadoBadge('$pagados pagado${pagados == 1 ? '' : 's'}', Colors.green.shade700),
+                                if (abonados > 0) ...[const SizedBox(width: 3), _estadoBadge('$abonados abonado${abonados == 1 ? '' : 's'}', Colors.orange.shade700)],
+                                if (pendientes > 0) ...[const SizedBox(width: 3), _estadoBadge('$pendientes pendiente${pendientes == 1 ? '' : 's'}', Colors.red.shade700)],
+                              ],
+                            ),
                           ],
                         ),
                       ),
-                      Text(
-                        AppConstants.formatCurrencyCOP(recaudado),
-                        style: GoogleFonts.outfit(fontWeight: FontWeight.w900, fontSize: 12, color: Colors.green.shade700),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Text(
+                            '+\$${NumberFormat('#,###', 'es_CO').format(recaudado.ceil())}',
+                            style: GoogleFonts.outfit(fontWeight: FontWeight.w900, fontSize: 11, color: Colors.green.shade700),
+                          ),
+                          if (pendiente > 0)
+                            Text(
+                              '-\$${NumberFormat('#,###', 'es_CO').format(pendiente.ceil())}',
+                              style: GoogleFonts.outfit(fontWeight: FontWeight.w700, fontSize: 9, color: Colors.red.shade600),
+                            ),
+                        ],
                       ),
                     ],
                   ),
@@ -995,6 +1065,17 @@ class _StatsScreenState extends State<StatsScreen> {
           ),
         );
       },
+    );
+  }
+
+  Widget _estadoBadge(String text, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Text(text, style: GoogleFonts.outfit(fontSize: 8, fontWeight: FontWeight.w800, color: color)),
     );
   }
 

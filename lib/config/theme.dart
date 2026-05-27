@@ -17,10 +17,51 @@ class AppTheme {
   static const Color textSecondary = Color(0xFFA0A0A0);
   static const Color dividerColor = Color(0xFF2A2A2A);
 
-  static const Color numeroDisponible = Color(0xFF1B5E20);
-  static const Color numeroReservado = Color(0xFFFBC02D); // Yellow/Amber
-  static const Color numeroPagado = Color(0xFF1976D2);    // Blue (matches video)
-  static const Color numeroSeleccionado = Color(0xFFE91E63); // Pink/Red for active selection
+  static const Color numeroDisponible = Color(0xFF1E1E1E);
+  static const Color numeroDisponibleBorder = Color(0xFF6B5B00);
+  static const Color numeroReservado = Color(0xFFFFB300);
+  static const Color numeroReservadoText = Color(0xFF1A1A1A);
+  static const Color numeroPagado = Color(0xFF0052CC);
+  static const Color numeroPagadoText = Color(0xFFFFFFFF);
+  static const Color numeroSeleccionado = Color(0xFFFF1744);
+  static const Color numeroSeleccionadoGlow = Color(0xFFFF4081);
+
+  // Glassmorphism
+  static Color get glassBorder => primaryColor.withValues(alpha: 0.12);
+  static Color get glassSurface => cardColor.withValues(alpha: 0.85);
+  static BoxDecoration get glassCard => BoxDecoration(
+    color: glassSurface,
+    borderRadius: BorderRadius.circular(20),
+    border: Border.all(color: primaryColor.withValues(alpha: 0.15), width: 1),
+    boxShadow: [
+      BoxShadow(
+        color: primaryColor.withValues(alpha: 0.06),
+        blurRadius: 20,
+        offset: const Offset(0, 4),
+      ),
+      BoxShadow(
+        color: Colors.black.withValues(alpha: 0.3),
+        blurRadius: 12,
+        offset: const Offset(0, 2),
+      ),
+    ],
+  );
+  static BoxDecoration get premiumCard => BoxDecoration(
+    gradient: LinearGradient(
+      colors: [cardColor, surfaceColor],
+      begin: Alignment.topLeft,
+      end: Alignment.bottomRight,
+    ),
+    borderRadius: BorderRadius.circular(20),
+    border: Border.all(color: primaryColor.withValues(alpha: 0.1), width: 0.5),
+    boxShadow: [
+      BoxShadow(
+        color: primaryColor.withValues(alpha: 0.04),
+        blurRadius: 16,
+        offset: const Offset(0, 4),
+      ),
+    ],
+  );
 
   // Gradientes
   static LinearGradient get goldGradient => const LinearGradient(
@@ -68,9 +109,10 @@ class AppTheme {
         color: cardColor,
         elevation: 0,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(28),
-          side: BorderSide(color: dividerColor.withValues(alpha: 0.6), width: 1),
+          borderRadius: BorderRadius.circular(20),
+          side: BorderSide(color: primaryColor.withValues(alpha: 0.1), width: 0.5),
         ),
+        shadowColor: primaryColor.withValues(alpha: 0.04),
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(

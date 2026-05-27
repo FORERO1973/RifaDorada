@@ -100,6 +100,7 @@ class Participante {
   final bool botNotified;
   final String? organizacionId;
   final String? creadoPor;
+  final String? creadoPorNombre;
   final String? vendedorId;
 
   Participante({
@@ -119,23 +120,26 @@ class Participante {
     this.botNotified = false,
     this.organizacionId,
     this.creadoPor,
+    this.creadoPorNombre,
     this.vendedorId,
   });
 
   factory Participante.fromMap(Map<String, dynamic> map, String id) {
     List<Abono> abonosList = [];
-    if (map['abonos'] != null) {
+    if (map['abonos'] != null && map['abonos'] is Map<String, dynamic>) {
       final abonosMap = map['abonos'] as Map<String, dynamic>;
       abonosList = abonosMap.entries
+          .where((e) => e.value is Map<String, dynamic>)
           .map((e) => Abono.fromMap(e.value as Map<String, dynamic>, e.key))
           .toList();
       abonosList.sort((a, b) => b.fecha.compareTo(a.fecha));
     }
 
     List<HistorialCambio> historialList = [];
-    if (map['historial'] != null) {
+    if (map['historial'] != null && map['historial'] is Map<String, dynamic>) {
       final historialMap = map['historial'] as Map<String, dynamic>;
       historialList = historialMap.entries
+          .where((e) => e.value is Map<String, dynamic>)
           .map((e) => HistorialCambio.fromMap(e.value as Map<String, dynamic>, e.key))
           .toList();
       historialList.sort((a, b) => b.fecha.compareTo(a.fecha));
@@ -162,6 +166,7 @@ class Participante {
       botNotified: map['bot_notified'] ?? false,
       organizacionId: map['organizacionId'],
       creadoPor: map['creadoPor'],
+      creadoPorNombre: map['creadoPorNombre'],
       vendedorId: map['vendedorId'],
     );
   }
@@ -197,6 +202,7 @@ class Participante {
       'bot_notified': botNotified,
       'organizacionId': organizacionId,
       'creadoPor': creadoPor,
+      'creadoPorNombre': creadoPorNombre,
       'vendedorId': vendedorId,
     };
   }
@@ -218,6 +224,7 @@ class Participante {
     bool? botNotified,
     String? organizacionId,
     String? creadoPor,
+    String? creadoPorNombre,
     String? vendedorId,
   }) {
     return Participante(
@@ -237,6 +244,7 @@ class Participante {
       botNotified: botNotified ?? this.botNotified,
       organizacionId: organizacionId ?? this.organizacionId,
       creadoPor: creadoPor ?? this.creadoPor,
+      creadoPorNombre: creadoPorNombre ?? this.creadoPorNombre,
       vendedorId: vendedorId ?? this.vendedorId,
     );
   }

@@ -13,6 +13,10 @@ import 'crear_rifa_screen.dart';
 import 'selector_numeros_screen.dart';
 import 'imagen_estado_screen.dart';
 import 'sales_list_screen.dart';
+import 'configuracion_screen.dart';
+import 'stats_screen.dart';
+import '../services/firebase_service.dart';
+import '../services/report_service.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -160,8 +164,8 @@ class _HomeScreenState extends State<HomeScreen>
               ),
             ),
             Container(
-              height: 50,
-              width: 50,
+              height: 60,
+              width: 60,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 boxShadow: [
@@ -172,7 +176,9 @@ class _HomeScreenState extends State<HomeScreen>
                   ),
                 ],
               ),
-              child: Image.asset('assets/logo/logo.png', fit: BoxFit.contain),
+              child: ClipOval(
+                child: Image.asset('assets/logo/logo.png', fit: BoxFit.cover),
+              ),
             ),
           ],
         ),
@@ -348,8 +354,9 @@ class _HomeScreenState extends State<HomeScreen>
   Widget _buildQuickStats() {
     return Consumer<RifaProvider>(
       builder: (context, provider, child) {
+        final totalRifas = provider.rifas.length;
         final rifasActivas = provider.rifas.where((r) => r.activa).length;
-        final totalNumeros = provider.rifas.fold(0, (sum, r) => sum + r.cantidadNumeros);
+        final totalCupos = provider.rifas.fold<int>(0, (sum, r) => sum + r.cantidadNumeros);
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -380,11 +387,11 @@ class _HomeScreenState extends State<HomeScreen>
               ),
               child: Row(
                 children: [
-                  Expanded(child: _buildStatItemMini('Rifas', '$rifasActivas', Icons.style_rounded, AppTheme.primaryColor)),
+                  Expanded(child: _buildStatItemMini('Rifas', '$totalRifas', Icons.confirmation_number_rounded, AppTheme.secondaryColor)),
                   _buildStatDivider(),
-                  Expanded(child: _buildStatItemMini('Cupos', '$totalNumeros', Icons.grid_view_rounded, Colors.blue)),
+                  Expanded(child: _buildStatItemMini('Activas', '$rifasActivas', Icons.style_rounded, AppTheme.primaryColor)),
                   _buildStatDivider(),
-                  Expanded(child: _buildStatItemMini('Total', '${provider.rifas.length}', Icons.confirmation_number_rounded, AppTheme.secondaryColor)),
+                  Expanded(child: _buildStatItemMini('Cupos', '$totalCupos', Icons.grid_view_rounded, Colors.blue)),
                 ],
               ),
             ),
@@ -470,12 +477,18 @@ class _HomeScreenState extends State<HomeScreen>
               label: 'Ver Estado',
               color: Colors.blue,
               onTap: () {
-                if (provider.rifaSeleccionada != null) {
-                  Navigator.push(context, MaterialPageRoute(builder: (_) => const ImagenEstadoScreen()));
-                } else {
+                if (provider.rifas.isEmpty) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Selecciona una rifa primero'), backgroundColor: Colors.orange),
+                    const SnackBar(content: Text('Primero crea una rifa'), backgroundColor: Colors.orange),
                   );
+                } else {
+                  _showRifaSelectionSheet((rifa) async {
+                    provider.setRifaSeleccionada(rifa);
+                    await provider.loadNumeros(rifa.id);
+                    if (context.mounted) {
+                      Navigator.push(context, MaterialPageRoute(builder: (_) => const ImagenEstadoScreen()));
+                    }
+                  });
                 }
               },
             ),
@@ -494,8 +507,13 @@ class _HomeScreenState extends State<HomeScreen>
               label: 'Exportar',
               color: Colors.purple,
               onTap: () {
-                if (provider.rifas.isNotEmpty) {
-                  provider.exportarDatosCSV();
+                if (provider.rifas.isEmpty) return;
+                if (provider.rifas.length == 1) {
+                  _showExportFormatDialog(context, provider.rifas.first, provider);
+                } else {
+                  _showRifaSelectionSheet((rifa) {
+                    _showExportFormatDialog(context, rifa, provider);
+                  });
                 }
               },
             ),
@@ -504,9 +522,7 @@ class _HomeScreenState extends State<HomeScreen>
               label: 'WhatsApp',
               color: Colors.green,
               onTap: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Ve a Configuración > Chatbot WhatsApp'), backgroundColor: Colors.orange),
-                );
+                Navigator.push(context, MaterialPageRoute(builder: (_) => const ConfiguracionScreen()));
               },
             ),
             _buildQuickActionCard(
@@ -514,9 +530,7 @@ class _HomeScreenState extends State<HomeScreen>
               label: 'Stats',
               color: Colors.orange,
               onTap: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Ve a la pestaña de Estadísticas'), backgroundColor: Colors.orange),
-                );
+                Navigator.push(context, MaterialPageRoute(builder: (_) => const StatsScreen()));
               },
             ),
           ],
@@ -568,6 +582,106 @@ class _HomeScreenState extends State<HomeScreen>
         ),
       ),
     );
+  }
+
+  void _showRifaSelectionSheet(void Function(Rifa rifa) onSelected) {
+    final rifas = context.read<RifaProvider>().rifas;
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: AppTheme.cardColor,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => Padding(
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey[600], borderRadius: BorderRadius.circular(2))),
+            const SizedBox(height: 16),
+            Text('Selecciona una rifa', style: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.w700, color: AppTheme.textPrimary)),
+            const SizedBox(height: 16),
+            ...rifas.map((r) => ListTile(
+                  leading: Icon(Icons.confirmation_number_rounded, color: AppTheme.primaryColor),
+                  title: Text(r.nombre, style: GoogleFonts.outfit(color: AppTheme.textPrimary)),
+                  subtitle: Text('\$${NumberFormat('#,###', 'es_CO').format(r.precioNumero)}/num', style: TextStyle(color: AppTheme.textSecondary, fontSize: 12)),
+                  onTap: () {
+                    final selected = r;
+                    Navigator.pop(ctx);
+                    Future.microtask(() => onSelected(selected));
+                  },
+                )),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _showExportFormatDialog(BuildContext ctx, Rifa rifa, RifaProvider provider) async {
+    final result = await showDialog<String>(
+      context: ctx,
+      builder: (dialogCtx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        backgroundColor: AppTheme.cardColor,
+        title: const Text('Exportar Reporte'),
+        content: const Text('Selecciona el formato:'),
+        actions: [
+          TextButton.icon(
+            onPressed: () => Navigator.pop(dialogCtx, 'csv'),
+            icon: const Icon(Icons.table_chart_rounded, size: 18),
+            label: const Text('CSV'),
+          ),
+          ElevatedButton.icon(
+            onPressed: () => Navigator.pop(dialogCtx, 'pdf'),
+            icon: const Icon(Icons.picture_as_pdf_rounded, size: 18),
+            label: const Text('PDF'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red.shade700,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (result == null || ctx.mounted == false) return;
+
+    if (result == 'csv') {
+      provider.exportarDatosCSV(rifaId: rifa.id, nombreRifa: rifa.nombre);
+    } else {
+      try {
+        final auth = ctx.read<AuthProvider>();
+        final config = await FirebaseService.instance.getAppConfig(organizacionId: auth.organizacionId);
+        final participantes = await FirebaseService.instance.getParticipantesOnce(rifa.id);
+        final numerosMap = await FirebaseService.instance.getNumeros(rifa.id);
+        final numerosEstado = numerosMap.map((k, v) => MapEntry(k, v.estado.name));
+        if (participantes.isEmpty) {
+          if (ctx.mounted) {
+            ScaffoldMessenger.of(ctx).showSnackBar(
+              const SnackBar(content: Text('No hay participantes para exportar'), backgroundColor: Colors.orange),
+            );
+          }
+          return;
+        }
+        await ReportService.instance.generatePdfReport(
+          rifa: rifa,
+          participantes: participantes,
+          organizacion: config?.organizacion,
+          numerosEstado: numerosEstado,
+        );
+        if (ctx.mounted) {
+          ScaffoldMessenger.of(ctx).showSnackBar(
+            SnackBar(content: Text('PDF exportado: ${rifa.nombre}')),
+          );
+        }
+      } catch (e) {
+        if (ctx.mounted) {
+          ScaffoldMessenger.of(ctx).showSnackBar(
+            SnackBar(content: Text('Error al exportar PDF: $e'), backgroundColor: Colors.red),
+          );
+        }
+      }
+    }
   }
 
   Widget _buildActiveRifasTitle() {

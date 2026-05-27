@@ -1,0 +1,63 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "rifas",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "organizacionId", "order": "ASCENDING" },
+        { "fieldPath": "fechaCreacion", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "rifas",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "organizacionId", "order": "ASCENDING" },
+        { "fieldPath": "activa", "order": "ASCENDING" },
+        { "fieldPath": "fechaCreacion", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "participantes",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "rifaId", "order": "ASCENDING" },
+        { "fieldPath": "fechaCreacion", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "participantes",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "organizacionId", "order": "ASCENDING" },
+        { "fieldPath": "fechaCreacion", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "participantes",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "organizacionId", "order": "ASCENDING" },
+        { "fieldPath": "vendedorId", "order": "ASCENDING" },
+        { "fieldPath": "fechaCreacion", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "participantes",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "whatsapp", "order": "ASCENDING" },
+        { "fieldPath": "rifaId", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "numeros",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "rifaId", "order": "ASCENDING" },
+        { "fieldPath": "numero", "order": "ASCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}

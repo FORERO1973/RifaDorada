@@ -208,297 +208,295 @@ class _TicketScreenState extends State<TicketScreen> {
     final isPaid = estado == EstadoPago.pagado;
     final isAbonado = estado == EstadoPago.abonado;
 
-    return Container(
-      width: double.infinity,
-      decoration: BoxDecoration(
-        color: AppTheme.surfaceColor,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(
-          color: AppTheme.primaryColor.withValues(alpha: 0.3),
-          width: 1.5,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.5),
-            blurRadius: 20,
-            offset: const Offset(0, 10),
-          ),
-        ],
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // Header del Ticket
-          Container(
-            padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(
-              gradient: AppTheme.goldGradient,
-              borderRadius: const BorderRadius.only(
-                topLeft: Radius.circular(22),
-                topRight: Radius.circular(22),
-              ),
+    return ClipPath(
+      clipper: _TicketClipper(),
+      child: Container(
+        width: double.infinity,
+        decoration: BoxDecoration(
+          color: AppTheme.surfaceColor,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.5),
+              blurRadius: 20,
+              offset: const Offset(0, 10),
             ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    if (widget.rifa.organizacion != null)
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Header del Ticket
+            Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                gradient: AppTheme.goldGradient,
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (widget.rifa.organizacion != null)
+                        Text(
+                          widget.rifa.organizacion!.toUpperCase(),
+                          style: GoogleFonts.outfit(
+                            fontWeight: FontWeight.w900,
+                            fontSize: 10,
+                            color: Colors.black54,
+                            letterSpacing: 1,
+                          ),
+                        ),
                       Text(
-                        widget.rifa.organizacion!.toUpperCase(),
+                        'TICKET DE RIFA',
                         style: GoogleFonts.outfit(
                           fontWeight: FontWeight.w900,
-                          fontSize: 10,
-                          color: Colors.black54,
-                          letterSpacing: 1,
+                          fontSize: 12,
+                          letterSpacing: 2,
+                          color: Colors.black,
                         ),
                       ),
-                    Text(
-                      'TICKET DE RIFA',
-                      style: GoogleFonts.outfit(
-                        fontWeight: FontWeight.w900,
-                        fontSize: 12,
-                        letterSpacing: 2,
-                        color: Colors.black,
+                      const SizedBox(height: 4),
+                      Text(
+                        '#${widget.participante.id.substring(widget.participante.id.length - 6).toUpperCase()}',
+                        style: GoogleFonts.outfit(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 18,
+                          color: Colors.black,
+                        ),
                       ),
+                    ],
+                  ),
+                  const Icon(Icons.stars_rounded, color: Colors.black, size: 40),
+                ],
+              ),
+            ),
+
+            // Contenido del Ticket
+            Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                children: [
+                  Text(
+                    widget.rifa.nombre.toUpperCase(),
+                    textAlign: TextAlign.center,
+                    style: GoogleFonts.outfit(
+                      fontWeight: FontWeight.w900,
+                      fontSize: 24,
+                      color: AppTheme.primaryColor,
                     ),
-                    const SizedBox(height: 4),
+                  ),
+                  if (widget.rifa.fechaSorteo != null) ...[
+                    const SizedBox(height: 8),
                     Text(
-                      '#${widget.participante.id.substring(widget.participante.id.length - 6).toUpperCase()}',
+                      'Sorteo: ${_formatDate(widget.rifa.fechaSorteo!)}',
                       style: GoogleFonts.outfit(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 18,
-                        color: Colors.black,
+                        fontSize: 12,
+                        color: Colors.white70,
                       ),
                     ),
                   ],
-                ),
-                const Icon(Icons.stars_rounded, color: Colors.black, size: 40),
-              ],
-            ),
-          ),
+                  const SizedBox(height: 24),
+                  _buildInfoRow('PARTICIPANTE', widget.participante.nombre),
+                  _buildDottedDivider(),
+                  _buildInfoRow('WHATSAPP', widget.participante.whatsapp),
+                  _buildDottedDivider(),
+                  _buildInfoRow('CIUDAD', widget.participante.ciudad),
+                  const SizedBox(height: 32),
 
-          // Contenido del Ticket
-          Padding(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              children: [
-                Text(
-                  widget.rifa.nombre.toUpperCase(),
-                  textAlign: TextAlign.center,
-                  style: GoogleFonts.outfit(
-                    fontWeight: FontWeight.w900,
-                    fontSize: 24,
-                    color: AppTheme.primaryColor,
-                  ),
-                ),
-                if (widget.rifa.fechaSorteo != null) ...[
-                  const SizedBox(height: 8),
+                  // Números Seleccionados
                   Text(
-                    'Sorteo: ${_formatDate(widget.rifa.fechaSorteo!)}',
+                    'NÚMEROS ASIGNADOS',
                     style: GoogleFonts.outfit(
                       fontSize: 12,
-                      color: Colors.white70,
+                      letterSpacing: 1,
+                      color: AppTheme.textSecondary,
                     ),
                   ),
-                ],
-                const SizedBox(height: 24),
-                _buildInfoRow('PARTICIPANTE', widget.participante.nombre),
-                const Divider(height: 32, color: Colors.white10),
-                _buildInfoRow('WHATSAPP', widget.participante.whatsapp),
-                const Divider(height: 32, color: Colors.white10),
-                _buildInfoRow('CIUDAD', widget.participante.ciudad),
-                const SizedBox(height: 32),
-
-                // Números Seleccionados
-                Text(
-                  'NÚMEROS ASIGNADOS',
-                  style: GoogleFonts.outfit(
-                    fontSize: 12,
-                    letterSpacing: 1,
-                    color: AppTheme.textSecondary,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                if (widget.participante.numeros.isEmpty)
-                  const Text('Ninguno', style: TextStyle(color: Colors.white54))
-                else
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    alignment: WrapAlignment.center,
-                    children: widget.participante.numeros
-                        .map(
-                          (n) => Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 8,
-                            ),
-                            decoration: BoxDecoration(
-                              color: AppTheme.primaryColor.withValues(
-                                alpha: 0.1,
+                  const SizedBox(height: 12),
+                  if (widget.participante.numeros.isEmpty)
+                    const Text('Ninguno', style: TextStyle(color: Colors.white54))
+                  else
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      alignment: WrapAlignment.center,
+                      children: widget.participante.numeros
+                          .map(
+                            (n) => Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 8,
                               ),
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(
+                              decoration: BoxDecoration(
                                 color: AppTheme.primaryColor.withValues(
-                                  alpha: 0.5,
+                                  alpha: 0.1,
+                                ),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: AppTheme.primaryColor.withValues(
+                                    alpha: 0.5,
+                                  ),
+                                ),
+                              ),
+                              child: Text(
+                                n,
+                                style: GoogleFonts.outfit(
+                                  fontWeight: FontWeight.w900,
+                                  fontSize: 20,
+                                  color: AppTheme.primaryColor,
                                 ),
                               ),
                             ),
-                            child: Text(
-                              n,
-                              style: GoogleFonts.outfit(
-                                fontWeight: FontWeight.w900,
-                                fontSize: 20,
-                                color: AppTheme.primaryColor,
-                              ),
+                          )
+                          .toList(),
+                    ),
+                  const SizedBox(height: 32),
+
+                  // Estado de Pago y Valor
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'TOTAL',
+                            style: GoogleFonts.outfit(
+                              fontSize: 10,
+                              color: AppTheme.textSecondary,
                             ),
                           ),
-                        )
-                        .toList(),
-                  ),
-                const SizedBox(height: 32),
-
-                // Estado de Pago y Valor
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'TOTAL',
-                          style: GoogleFonts.outfit(
-                            fontSize: 10,
-                            color: AppTheme.textSecondary,
+                          Text(
+                            AppConstants.formatCurrencyCOP(
+                              widget.participante.numeros.length *
+                                  widget.rifa.precioNumero,
+                            ),
+                            style: GoogleFonts.outfit(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 20,
+                              color: Colors.white,
+                            ),
                           ),
+                        ],
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 8,
                         ),
-                        Text(
-                          AppConstants.formatCurrencyCOP(
-                            widget.participante.numeros.length *
-                                widget.rifa.precioNumero,
-                          ),
-                          style: GoogleFonts.outfit(
+                        decoration: BoxDecoration(
+                          color: isPaid
+                              ? AppTheme.secondaryColor
+                              : isAbonado
+                                  ? Colors.orange
+                                  : AppTheme.errorColor,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          isPaid ? 'PAGADO' : isAbonado ? 'ABONADO' : 'PENDIENTE',
+                          style: const TextStyle(
                             fontWeight: FontWeight.bold,
-                            fontSize: 20,
                             color: Colors.white,
                           ),
                         ),
-                      ],
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 8,
                       ),
-                      decoration: BoxDecoration(
-                        color: isPaid
-                            ? AppTheme.secondaryColor
-                            : isAbonado
-                                ? Colors.orange
-                                : AppTheme.errorColor,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Text(
-                        isPaid ? 'PAGADO' : isAbonado ? 'ABONADO' : 'PENDIENTE',
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 24),
+                    ],
+                  ),
+                  const SizedBox(height: 24),
+                  _buildDottedDivider(),
 
-                // QR Simulado y Footer
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Sorteo:',
-                          style: TextStyle(
-                            fontSize: 10,
-                            color: AppTheme.textSecondary,
+                  // QR Simulado y Footer
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Sorteo:',
+                            style: TextStyle(
+                              fontSize: 10,
+                              color: AppTheme.textSecondary,
+                            ),
                           ),
-                        ),
-                        Text(
-                          widget.rifa.loteria ?? 'Lotería por definir',
-                          style: const TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
+                          Text(
+                            widget.rifa.loteria ?? 'Lotería por definir',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
-                        ),
-                      ],
-                    ),
-                    const Icon(
-                      Icons.qr_code_2_rounded,
-                      size: 60,
-                      color: Colors.white54,
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-
-          // Pie del ticket con diseño de "corte"
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.symmetric(vertical: 12),
-            decoration: BoxDecoration(
-              color: AppTheme.primaryColor.withValues(alpha: 0.05),
-              borderRadius: const BorderRadius.only(
-                bottomLeft: Radius.circular(22),
-                bottomRight: Radius.circular(22),
+                        ],
+                      ),
+                      const Icon(
+                        Icons.qr_code_2_rounded,
+                        size: 60,
+                        color: Colors.white54,
+                      ),
+                    ],
+                  ),
+                ],
               ),
             ),
-            child: Column(
-              children: [
-                if (_orgResponsable != null)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 4),
-                    child: Text(
-                      'RESPONSABLE: $_orgResponsable',
-                      textAlign: TextAlign.center,
-                      style: GoogleFonts.outfit(
-                        fontSize: 9,
-                        fontWeight: FontWeight.bold,
-                        color: AppTheme.textSecondary.withValues(alpha: 0.8),
+
+            // Pie del ticket
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              decoration: BoxDecoration(
+                color: AppTheme.primaryColor.withValues(alpha: 0.05),
+              ),
+              child: Column(
+                children: [
+                  if (_orgResponsable != null)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 4),
+                      child: Text(
+                        'RESPONSABLE: $_orgResponsable',
+                        textAlign: TextAlign.center,
+                        style: GoogleFonts.outfit(
+                          fontSize: 9,
+                          fontWeight: FontWeight.bold,
+                          color: AppTheme.textSecondary.withValues(alpha: 0.8),
+                        ),
                       ),
                     ),
-                  ),
-                if (_orgCuenta != null)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 4),
-                    child: Text(
-                      'Pagos: $_orgCuenta (${_orgMetodoPago?.toUpperCase() ?? ''})',
-                      textAlign: TextAlign.center,
-                      style: GoogleFonts.outfit(
-                        fontSize: 9,
-                        fontWeight: FontWeight.bold,
-                        color: AppTheme.textSecondary.withValues(alpha: 0.8),
+                  if (_orgCuenta != null)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 4),
+                      child: Text(
+                        'Pagos: $_orgCuenta (${_orgMetodoPago?.toUpperCase() ?? ''})',
+                        textAlign: TextAlign.center,
+                        style: GoogleFonts.outfit(
+                          fontSize: 9,
+                          fontWeight: FontWeight.bold,
+                          color: AppTheme.textSecondary.withValues(alpha: 0.8),
+                        ),
                       ),
                     ),
+                  Text(
+                    'GRACIAS POR PARTICIPAR EN RIFADORADA',
+                    textAlign: TextAlign.center,
+                    style: GoogleFonts.outfit(
+                      fontSize: 10,
+                      letterSpacing: 2,
+                      color: AppTheme.textSecondary,
+                    ),
                   ),
-                Text(
-                  'GRACIAS POR PARTICIPAR EN RIFADORADA',
-                  textAlign: TextAlign.center,
-                  style: GoogleFonts.outfit(
-                    fontSize: 10,
-                    letterSpacing: 2,
-                    color: AppTheme.textSecondary,
-                  ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
+    );
+  }
+
+  Widget _buildDottedDivider() {
+    return CustomPaint(
+      size: const Size(double.infinity, 2),
+      painter: _DottedLinePainter(),
     );
   }
 
@@ -578,4 +576,88 @@ class _TicketScreenState extends State<TicketScreen> {
       }
     }
   }
+}
+
+class _TicketClipper extends CustomClipper<Path> {
+  @override
+  Path getClip(Size size) {
+    final path = Path();
+    const notchRadius = 12.0;
+
+    path.moveTo(0, 0);
+    path.lineTo(size.width, 0);
+    path.lineTo(size.width, size.height);
+
+    // Bottom edge with notches
+    path.lineTo(size.width * 0.75, size.height);
+    path.arcToPoint(
+      Offset(size.width * 0.75 - notchRadius * 2, size.height),
+      radius: const Radius.circular(notchRadius),
+      clockwise: false,
+    );
+    path.lineTo(size.width * 0.5 + notchRadius, size.height);
+    path.arcToPoint(
+      Offset(size.width * 0.5 - notchRadius, size.height),
+      radius: const Radius.circular(notchRadius),
+      clockwise: false,
+    );
+    path.lineTo(notchRadius * 2, size.height);
+    path.arcToPoint(
+      Offset(0, size.height),
+      radius: const Radius.circular(notchRadius),
+      clockwise: false,
+    );
+
+    // Left edge with notches
+    path.lineTo(0, size.height * 0.75);
+    path.arcToPoint(
+      Offset(0, size.height * 0.75 - notchRadius * 2),
+      radius: const Radius.circular(notchRadius),
+      clockwise: false,
+    );
+    path.lineTo(0, size.height * 0.5 + notchRadius);
+    path.arcToPoint(
+      Offset(0, size.height * 0.5 - notchRadius),
+      radius: const Radius.circular(notchRadius),
+      clockwise: false,
+    );
+    path.lineTo(0, notchRadius * 2);
+    path.arcToPoint(
+      Offset(0, 0),
+      radius: const Radius.circular(notchRadius),
+      clockwise: false,
+    );
+
+    path.close();
+    return path;
+  }
+
+  @override
+  bool shouldReclip(CustomClipper<Path> oldClipper) => false;
+}
+
+class _DottedLinePainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = AppTheme.primaryColor.withValues(alpha: 0.3)
+      ..strokeWidth = 1.5
+      ..style = PaintingStyle.stroke;
+
+    const dashWidth = 4.0;
+    const dashSpace = 4.0;
+    double startX = 0;
+
+    while (startX < size.width) {
+      canvas.drawLine(
+        Offset(startX, 0),
+        Offset(startX + dashWidth, 0),
+        paint,
+      );
+      startX += dashWidth + dashSpace;
+    }
+  }
+
+  @override
+  bool shouldRepaint(CustomPainter oldDelegate) => false;
 }

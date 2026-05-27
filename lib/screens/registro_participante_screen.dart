@@ -7,6 +7,7 @@ import 'package:permission_handler/permission_handler.dart';
 import '../config/theme.dart';
 import '../config/constants.dart';
 import '../providers/rifa_provider.dart';
+import '../providers/auth_provider.dart';
 import '../models/rifa.dart';
 import '../models/participante.dart';
 import 'ticket_screen.dart';
@@ -27,9 +28,11 @@ class _RegistroParticipanteScreenState
   final _whatsappController = TextEditingController();
   final _documentoController = TextEditingController();
   final _notasController = TextEditingController();
+  final _ciudadSearchController = TextEditingController();
   String _ciudadSeleccionada = AppConstants.ciudadesColombia.first;
   bool _isPickingContact = false;
   bool _enviarWhatsApp = true;
+  String _citySearchQuery = '';
 
   Future<void> _pickContact() async {
     if (kIsWeb) {
@@ -90,6 +93,7 @@ class _RegistroParticipanteScreenState
     _whatsappController.dispose();
     _documentoController.dispose();
     _notasController.dispose();
+    _ciudadSearchController.dispose();
     super.dispose();
   }
 
@@ -139,7 +143,7 @@ class _RegistroParticipanteScreenState
               },
             ),
             const SizedBox(height: 16),
-            _buildCityDropdown(),
+            _buildCitySelector(),
             const SizedBox(height: 16),
             _buildTextField(
               controller: _documentoController,
@@ -183,6 +187,133 @@ class _RegistroParticipanteScreenState
             const SizedBox(height: 40),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildCitySelector() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Ciudad',
+          style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.textSecondary),
+        ),
+        const SizedBox(height: 8),
+        GestureDetector(
+          onTap: _showCityPicker,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            decoration: BoxDecoration(
+              color: AppTheme.surfaceColor,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: AppTheme.dividerColor),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.location_city_rounded, color: AppTheme.primaryColor, size: 20),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    _ciudadSeleccionada,
+                    style: GoogleFonts.outfit(fontSize: 14, color: AppTheme.textPrimary),
+                  ),
+                ),
+                const Icon(Icons.arrow_drop_down_rounded, color: AppTheme.primaryColor),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  void _showCityPicker() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppTheme.cardColor,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setModalState) {
+          final filtered = AppConstants.ciudadesColombia.where((c) {
+            if (_citySearchQuery.isEmpty) return true;
+            return c.toLowerCase().contains(_citySearchQuery.toLowerCase());
+          }).toList();
+
+          return Container(
+            constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.6),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: AppTheme.surfaceColor,
+                    borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+                  ),
+                  child: Column(
+                    children: [
+                      Container(
+                        width: 40,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: AppTheme.dividerColor,
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: _ciudadSearchController,
+                        onChanged: (v) => setModalState(() => _citySearchQuery = v),
+                        decoration: InputDecoration(
+                          hintText: 'Buscar ciudad...',
+                          prefixIcon: const Icon(Icons.search_rounded, color: AppTheme.primaryColor),
+                          suffixIcon: _citySearchQuery.isNotEmpty
+                              ? IconButton(
+                                  icon: const Icon(Icons.clear_rounded),
+                                  onPressed: () {
+                                    _ciudadSearchController.clear();
+                                    setModalState(() => _citySearchQuery = '');
+                                  },
+                                )
+                              : null,
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Expanded(
+                  child: ListView.builder(
+                    itemCount: filtered.length,
+                    itemBuilder: (ctx, i) {
+                      final city = filtered[i];
+                      final isSelected = city == _ciudadSeleccionada;
+                      return ListTile(
+                        leading: Icon(
+                          isSelected ? Icons.check_circle_rounded : Icons.location_on_outlined,
+                          color: isSelected ? AppTheme.primaryColor : AppTheme.textSecondary,
+                        ),
+                        title: Text(city, style: GoogleFonts.outfit(
+                          fontWeight: isSelected ? FontWeight.w700 : FontWeight.normal,
+                          color: isSelected ? AppTheme.primaryColor : AppTheme.textPrimary,
+                        )),
+                        onTap: () {
+                          setState(() => _ciudadSeleccionada = city);
+                          Navigator.pop(ctx);
+                        },
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
       ),
     );
   }
@@ -265,23 +396,6 @@ class _RegistroParticipanteScreenState
         side: const BorderSide(color: AppTheme.primaryColor),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
-    );
-  }
-
-  Widget _buildCityDropdown() {
-    return DropdownButtonFormField<String>(
-      initialValue: _ciudadSeleccionada,
-      decoration: InputDecoration(
-        labelText: 'Ciudad',
-        prefixIcon: const Icon(Icons.location_city_rounded),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-      ),
-      items: AppConstants.ciudadesColombia.map((ciudad) {
-        return DropdownMenuItem(value: ciudad, child: Text(ciudad));
-      }).toList(),
-      onChanged: (value) {
-        setState(() => _ciudadSeleccionada = value!);
-      },
     );
   }
 
@@ -420,6 +534,7 @@ class _RegistroParticipanteScreenState
     final numerosSeleccionados = provider.numerosSeleccionados.toList();
 
     try {
+      final auth = context.read<AuthProvider>();
       final id = await provider.registrarParticipante(
         nombre: _nombreController.text.trim(),
         whatsapp: _whatsappController.text.trim(),
@@ -427,6 +542,7 @@ class _RegistroParticipanteScreenState
         documento: _documentoController.text.trim().isEmpty
             ? null
             : _documentoController.text.trim(),
+        creadoPorNombre: auth.currentUser?.nombre,
       );
 
       if (mounted) {
@@ -451,20 +567,23 @@ class _RegistroParticipanteScreenState
           ),
         );
 
-        final nav = Navigator.of(context);
-        Navigator.pop(context);
-        final ticketOk = await nav.push<bool>(
+        // Push TicketScreen on top (don't pop yet, or mounted becomes false)
+        final ticketOk = await Navigator.push<bool>(
+          context,
           MaterialPageRoute(
             builder: (_) => TicketScreen(
               participante: participante,
               rifa: rifa!,
               autoSend: _enviarWhatsApp,
+              autoPopAfterSend: true,
             ),
           ),
         );
 
-        if (ticketOk == true) {
-          nav.push(
+        // After ticket auto-sends & pops, push ImagenEstadoScreen
+        if (ticketOk == true && mounted) {
+          await Navigator.push(
+            context,
             MaterialPageRoute(
               builder: (_) => const ImagenEstadoScreen(
                 autoUpload: true,
@@ -473,6 +592,9 @@ class _RegistroParticipanteScreenState
             ),
           );
         }
+
+        // Now pop RegistroParticipanteScreen → back to SelectorNumerosScreen
+        if (mounted) Navigator.pop(context);
       }
     } catch (e) {
       if (mounted) {

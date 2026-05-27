@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'config/theme.dart';
@@ -13,6 +14,8 @@ import 'screens/login_screen.dart';
 import 'screens/vendedor_home_screen.dart';
 import 'screens/vendedor_ventas_screen.dart';
 import 'screens/super_admin_screen.dart';
+import 'screens/landing_screen.dart';
+import 'widgets/ticket_image_generator.dart';
 
 class RifaDoradaApp extends StatelessWidget {
   const RifaDoradaApp({super.key});
@@ -21,13 +24,31 @@ class RifaDoradaApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return Consumer<ThemeProvider>(
       builder: (context, themeProvider, child) {
+        final isWeb = kIsWeb;
+
         return MaterialApp(
+          navigatorKey: navigatorKey,
           title: 'RifaDorada',
           debugShowCheckedModeBanner: false,
           theme: AppTheme.lightTheme,
           darkTheme: AppTheme.darkTheme,
           themeMode: themeProvider.themeMode,
-          home: const AuthGateway(),
+          home: isWeb ? const LandingScreen() : const AuthGateway(),
+          routes: isWeb ? {
+            '/app': (_) => const AuthGateway(),
+          } : const {},
+          onGenerateRoute: isWeb ? (settings) {
+            if (settings.name != null && settings.name!.startsWith('/rifa/')) {
+              final rifaId = settings.name!.substring(6);
+              return PageRouteBuilder(
+                pageBuilder: (_, __, ___) => LandingScreen(rifaId: rifaId),
+                transitionsBuilder: (_, animation, __, child) =>
+                    FadeTransition(opacity: animation, child: child),
+                transitionDuration: const Duration(milliseconds: 250),
+              );
+            }
+            return null;
+          } : null,
         );
       },
     );

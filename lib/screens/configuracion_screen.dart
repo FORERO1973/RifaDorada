@@ -1,3 +1,5 @@
+import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
@@ -19,9 +21,15 @@ class ConfiguracionScreen extends StatefulWidget {
 
 class _ConfiguracionScreenState extends State<ConfiguracionScreen> {
   final _chatbotUrlController = TextEditingController();
+  final _botApiKeyController = TextEditingController();
   bool _isTesting = false;
   String? _connectionStatus;
   bool? _connectionSuccess;
+
+  String _botStatus = 'unknown';
+  String? _botQrBase64;
+  DateTime? _botLastCheck;
+  Timer? _statusPollTimer;
 
   final _orgController = TextEditingController();
   final _respController = TextEditingController();
@@ -46,17 +54,21 @@ class _ConfiguracionScreenState extends State<ConfiguracionScreen> {
   void initState() {
     super.initState();
     _chatbotUrlController.text = AppConstants.chatbotUrl;
+    _botApiKeyController.text = AppConstants.botApiKey;
     _loadAppConfig();
+    _startStatusPolling();
   }
 
   @override
   void dispose() {
     _chatbotUrlController.dispose();
+    _botApiKeyController.dispose();
     _orgController.dispose();
     _respController.dispose();
     _telController.dispose();
     _emailController.dispose();
     _cuentaController.dispose();
+    _statusPollTimer?.cancel();
     super.dispose();
   }
 
@@ -127,7 +139,10 @@ class _ConfiguracionScreenState extends State<ConfiguracionScreen> {
       final cleanUrl = url.endsWith('/') ? url.substring(0, url.length - 1) : url;
       final testUri = '$cleanUrl/v1/rifas';
       debugPrint('[CONFIG] Probando conexión a: $testUri');
-      final response = await http.get(Uri.parse(testUri)).timeout(const Duration(seconds: 5));
+      final apiKey = _botApiKeyController.text.trim();
+      final headers = <String, String>{'Content-Type': 'application/json'};
+      if (apiKey.isNotEmpty) headers['X-API-Key'] = apiKey;
+      final response = await http.get(Uri.parse(testUri), headers: headers).timeout(const Duration(seconds: 5));
       if (response.statusCode == 200) {
         setState(() { _connectionSuccess = true; _connectionStatus = '✅ Conexión exitosa'; });
       } else {
@@ -151,6 +166,90 @@ class _ConfiguracionScreenState extends State<ConfiguracionScreen> {
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('✅ URL del chatbot actualizada'), backgroundColor: AppTheme.secondaryColor));
     }
+  }
+
+  Future<void> _saveBotApiKey() async {
+    final key = _botApiKeyController.text.trim();
+    await AppConstants.setBotApiKey(key);
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('✅ API Key guardada'), backgroundColor: AppTheme.secondaryColor));
+    }
+  }
+
+  void _startStatusPolling() {
+    _fetchBotStatus();
+    _statusPollTimer = Timer.periodic(const Duration(seconds: 30), (_) => _fetchBotStatus());
+  }
+
+  Future<void> _fetchBotStatus() async {
+    try {
+      final baseUrl = AppConstants.chatbotUrl.trim();
+      if (baseUrl.isEmpty) return;
+      final cleanUrl = baseUrl.endsWith('/') ? baseUrl.substring(0, baseUrl.length - 1) : baseUrl;
+      final response = await http.get(Uri.parse('$cleanUrl/v1/status')).timeout(const Duration(seconds: 5));
+      if (response.statusCode == 200 && mounted) {
+        final data = jsonDecode(response.body);
+        setState(() {
+          _botStatus = data['status'] ?? 'unknown';
+          _botQrBase64 = data['qr'];
+          _botLastCheck = DateTime.now();
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _botStatus = 'disconnected';
+          _botLastCheck = DateTime.now();
+        });
+      }
+    }
+  }
+
+  void _showQrDialog() {
+    if (_botQrBase64 == null) return;
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppTheme.surfaceColor,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: [
+            const Icon(Icons.qr_code_rounded, color: AppTheme.primaryColor),
+            const SizedBox(width: 8),
+            Text('Escanea el QR', style: GoogleFonts.outfit(fontWeight: FontWeight.w700)),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              padding: const EdgeInsets.all(12),
+              child: Image.memory(
+                base64Decode(_botQrBase64!.split(',').last),
+                width: 250,
+                height: 250,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'Abre WhatsApp → Menú → Dispositivos vinculados',
+              style: GoogleFonts.outfit(fontSize: 12, color: AppTheme.textSecondary),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text('Cerrar', style: GoogleFonts.outfit(color: AppTheme.primaryColor, fontWeight: FontWeight.w700)),
+          ),
+        ],
+      ),
+    );
   }
 
   void _toggleSection(String key) {
@@ -418,6 +517,8 @@ class _ConfiguracionScreenState extends State<ConfiguracionScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        _buildBotStatusIndicator(),
+        const SizedBox(height: 16),
         Text('URL del Servidor', style: GoogleFonts.outfit(fontWeight: FontWeight.w700, fontSize: 13)),
         const SizedBox(height: 4),
         Text('Dirección del servidor del chatbot de WhatsApp', style: GoogleFonts.outfit(fontSize: 11, color: AppTheme.textSecondary)),
@@ -473,8 +574,137 @@ class _ConfiguracionScreenState extends State<ConfiguracionScreen> {
             ),
           ),
         ],
+        const SizedBox(height: 16),
+        Text('API Key', style: GoogleFonts.outfit(fontWeight: FontWeight.w700, fontSize: 13)),
+        const SizedBox(height: 4),
+        Text('Clave para autenticar las llamadas al servidor del bot', style: GoogleFonts.outfit(fontSize: 11, color: AppTheme.textSecondary)),
+        const SizedBox(height: 10),
+        TextField(
+          controller: _botApiKeyController,
+          obscureText: true,
+          style: GoogleFonts.outfit(fontWeight: FontWeight.w600, fontSize: 13),
+          decoration: InputDecoration(
+            hintText: 'Ingresa la API Key del bot',
+            prefixIcon: const Icon(Icons.vpn_key_rounded, size: 18),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+          ),
+        ),
+        const SizedBox(height: 10),
+        Row(
+          children: [
+            const Spacer(),
+            SizedBox(
+              width: 160,
+              child: ElevatedButton.icon(
+                onPressed: _saveBotApiKey,
+                icon: const Icon(Icons.save_rounded, size: 16),
+                label: const Text('Guardar API Key'),
+                style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 12), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
+              ),
+            ),
+          ],
+        ),
       ],
     );
+  }
+
+  Widget _buildBotStatusIndicator() {
+    Color statusColor;
+    IconData statusIcon;
+    String statusText;
+    String subText;
+
+    switch (_botStatus) {
+      case 'connected':
+        statusColor = Colors.green;
+        statusIcon = Icons.check_circle_rounded;
+        statusText = 'Conectado';
+        subText = _botLastCheck != null ? 'Actualizado ${_formatTime(_botLastCheck!)}' : 'En línea';
+        break;
+      case 'qr_pending':
+        statusColor = Colors.orange;
+        statusIcon = Icons.qr_code_rounded;
+        statusText = 'Esperando QR';
+        subText = 'Toca para escanear';
+        break;
+      case 'disconnected':
+      default:
+        statusColor = Colors.red;
+        statusIcon = Icons.error_rounded;
+        statusText = 'Desconectado';
+        subText = _botLastCheck != null ? 'Última verificación ${_formatTime(_botLastCheck!)}' : 'Sin conexión';
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: statusColor.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: statusColor.withValues(alpha: 0.25)),
+      ),
+      child: Row(
+        children: [
+          Stack(
+            children: [
+              Icon(statusIcon, color: statusColor, size: 28),
+              if (_botStatus == 'connected')
+                Positioned(
+                  right: 0,
+                  bottom: 0,
+                  child: Container(
+                    width: 8,
+                    height: 8,
+                    decoration: BoxDecoration(
+                      color: statusColor,
+                      shape: BoxShape.circle,
+                      boxShadow: [BoxShadow(color: statusColor.withValues(alpha: 0.5), blurRadius: 4)],
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  statusText,
+                  style: GoogleFonts.outfit(fontWeight: FontWeight.w700, fontSize: 14, color: statusColor),
+                ),
+                Text(
+                  subText,
+                  style: GoogleFonts.outfit(fontSize: 11, color: AppTheme.textSecondary),
+                ),
+              ],
+            ),
+          ),
+          if (_botStatus == 'qr_pending')
+            TextButton.icon(
+              onPressed: _showQrDialog,
+              icon: const Icon(Icons.qr_code_scanner_rounded, size: 18),
+              label: const Text('Ver QR'),
+              style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8)),
+            ),
+          if (_botStatus == 'disconnected')
+            IconButton(
+              onPressed: _fetchBotStatus,
+              icon: const Icon(Icons.refresh_rounded, size: 20),
+              tooltip: 'Reintentar',
+            ),
+        ],
+      ),
+    );
+  }
+
+  String _formatTime(DateTime dt) {
+    final now = DateTime.now();
+    final diff = now.difference(dt);
+    if (diff.inSeconds < 5) return 'ahora';
+    if (diff.inSeconds < 60) return 'hace ${diff.inSeconds}s';
+    if (diff.inMinutes < 60) return 'hace ${diff.inMinutes}m';
+    return '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
   }
 
   Widget _buildUserDataSection(BuildContext context, {bool readOnly = false}) {

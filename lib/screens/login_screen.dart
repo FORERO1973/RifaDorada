@@ -172,8 +172,8 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
           alignment: Alignment.center,
           children: [
             Container(
-              width: 160,
-              height: 160,
+              width: 180,
+              height: 180,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 boxShadow: [
@@ -190,7 +190,9 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                 ],
               ),
             ),
-            Image.asset('assets/logo/logo.png', width: 200, height: 200, fit: BoxFit.contain),
+            ClipOval(
+              child: Image.asset('assets/logo/logo.png', width: 220, height: 220, fit: BoxFit.cover),
+            ),
           ],
         ),
         const SizedBox(height: 16),

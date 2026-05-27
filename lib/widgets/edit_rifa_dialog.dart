@@ -97,7 +97,7 @@ class _EditRifaDialogState extends State<EditRifaDialog> {
             base64List.add(base64Encode(bytes));
           }
           final response = await http.post(uri,
-              headers: {'Content-Type': 'application/json'},
+              headers: {'Content-Type': 'application/json', if (AppConstants.botApiKey.isNotEmpty) 'X-API-Key': AppConstants.botApiKey},
               body: jsonEncode({'images': base64List}));
           if (response.statusCode == 200) {
             final urls = List<String>.from(jsonDecode(response.body)['urls']);
@@ -109,8 +109,9 @@ class _EditRifaDialogState extends State<EditRifaDialog> {
           }
         } catch (_) {
           finalImages = finalImages.map((p) {
-            if (localPaths.contains(p))
+            if (localPaths.contains(p)) {
               return 'data:image/jpeg;base64,${base64Encode(File(p).readAsBytesSync())}';
+            }
             return p;
           }).toList();
         }

@@ -21,7 +21,10 @@ class SalesListScreen extends StatefulWidget {
 
 class _SalesListScreenState extends State<SalesListScreen> {
   String _searchQuery = '';
-  String _filterStatus = 'Todos'; // Todos, Pagados, Pendientes
+  String _filterStatus = 'Todos';
+  String _filterVendedor = 'Todos';
+  List<Map<String, dynamic>> _vendedores = [];
+  final Map<String, String> _vendedorNames = {};
   final TextEditingController _searchController = TextEditingController();
 
   @override
@@ -29,6 +32,7 @@ class _SalesListScreenState extends State<SalesListScreen> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<RifaProvider>().loadParticipantes(widget.rifa.id);
+      _loadVendedores();
     });
   }
 
@@ -36,6 +40,27 @@ class _SalesListScreenState extends State<SalesListScreen> {
   void dispose() {
     _searchController.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadVendedores() async {
+    final stats = await context.read<RifaProvider>().getVendedorStats(rifaId: widget.rifa.id);
+    final vendedores = stats['vendedores'] as List<dynamic>? ?? [];
+    if (mounted) {
+      setState(() {
+        _vendedores = vendedores.map((v) => v as Map<String, dynamic>).toList();
+        for (final v in _vendedores) {
+          final vid = v['vendedorId'] as String? ?? '';
+          final nombre = v['nombre'] as String? ?? vid;
+          _vendedorNames[vid] = nombre;
+        }
+      });
+    }
+  }
+
+  String _resolveVendedorName(Participante p) {
+    final vid = (p.vendedorId?.isNotEmpty == true) ? p.vendedorId! : 'admin';
+    if (p.creadoPorNombre?.isNotEmpty == true) return p.creadoPorNombre!;
+    return _vendedorNames[vid] ?? (vid == 'admin' ? 'Admin' : vid);
   }
 
   @override
@@ -81,7 +106,10 @@ class _SalesListScreenState extends State<SalesListScreen> {
                       (_filterStatus == 'Pendientes' &&
                           p.estadoPago == EstadoPago.pendiente);
 
-                  return matchesSearch && matchesFilter;
+                  final vid = (p.vendedorId?.isNotEmpty == true) ? p.vendedorId : 'admin';
+                  final matchesVendedor = _filterVendedor == 'Todos' || vid == _filterVendedor;
+
+                  return matchesSearch && matchesFilter && matchesVendedor;
                 }).toList();
 
                 if (filteredList.isEmpty) {
@@ -152,6 +180,50 @@ class _SalesListScreenState extends State<SalesListScreen> {
               }).toList(),
             ),
           ),
+          if (_vendedores.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Row(
+              children: [
+                Icon(Icons.filter_list_rounded, size: 14, color: AppTheme.textSecondary),
+                const SizedBox(width: 4),
+                Text('Vendedor:', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: AppTheme.textSecondary)),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 0),
+                    decoration: BoxDecoration(
+                      color: AppTheme.cardColor,
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: AppTheme.dividerColor),
+                    ),
+                    child: DropdownButtonHideUnderline(
+                      child: DropdownButton<String>(
+                        value: _filterVendedor,
+                        isDense: true,
+                        isExpanded: true,
+                        dropdownColor: AppTheme.cardColor,
+                        icon: const Icon(Icons.arrow_drop_down_rounded, color: AppTheme.primaryColor, size: 16),
+                        items: [
+                          const DropdownMenuItem(value: 'Todos', child: Text('Todos', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11))),
+                          ..._vendedores.map((v) {
+                            final vid = v['vendedorId'] as String? ?? '';
+                            final nombre = v['nombre'] as String? ?? (vid == 'admin' ? 'Admin' : vid);
+                            return DropdownMenuItem<String>(
+                              value: vid,
+                              child: Text(nombre, style: const TextStyle(fontSize: 11), overflow: TextOverflow.ellipsis),
+                            );
+                          }),
+                        ],
+                        onChanged: (val) {
+                          if (val != null) setState(() => _filterVendedor = val);
+                        },
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
         ],
       ),
     );
@@ -201,6 +273,21 @@ class _SalesListScreenState extends State<SalesListScreen> {
                         'WhatsApp: ${p.whatsapp}',
                         style: Theme.of(context).textTheme.bodySmall,
                       ),
+                      if (_vendedorNames.isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 2),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.person_outline_rounded, size: 12, color: AppTheme.primaryColor),
+                              const SizedBox(width: 3),
+                              Text(
+                                _resolveVendedorName(p),
+                                style: TextStyle(fontSize: 10, color: AppTheme.primaryColor, fontWeight: FontWeight.w600),
+                              ),
+                            ],
+                          ),
+                        ),
                     ],
                   ),
                 ),
@@ -286,9 +373,11 @@ class _SalesListScreenState extends State<SalesListScreen> {
                 ),
               ),
             ],
-            const Divider(height: 24),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
+            const Divider(height: 20),
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              alignment: WrapAlignment.end,
               children: [
                 _buildActionButton(
                   icon: Icons.delete_outline,
@@ -302,14 +391,12 @@ class _SalesListScreenState extends State<SalesListScreen> {
                   onTap: () => _contactWhatsApp(p),
                   label: 'WhatsApp',
                 ),
-                const SizedBox(width: 8),
                 _buildActionButton(
                   icon: Icons.add_circle_outline,
                   color: Colors.orange,
                   onTap: () => _showAbonoDialog(context, p, provider),
                   label: 'Abonar',
                 ),
-                const SizedBox(width: 8),
                 _buildActionButton(
                   icon: Icons.confirmation_number_outlined,
                   color: AppTheme.primaryColor,
@@ -322,32 +409,20 @@ class _SalesListScreenState extends State<SalesListScreen> {
                   ),
                   label: 'Ticket',
                 ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: !isPaid
-                      ? ElevatedButton.icon(
-                          onPressed: () => _confirmPago(context, p, provider),
-                          icon: const Icon(Icons.check_circle_outline, size: 16),
-                          label: const Text('PAGAR', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold), maxLines: 1, overflow: TextOverflow.ellipsis),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppTheme.secondaryColor,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(horizontal: 8),
-                            minimumSize: const Size(0, 40),
-                          ),
-                        )
-                      : OutlinedButton.icon(
-                          onPressed: () => _confirmAction(context, title: 'Revertir Pago', message: '¿Estás seguro de REVERTIR el pago de ${p.nombre}?', onConfirm: () => provider.marcarPago(p.id, false)),
-                          icon: const Icon(Icons.history, size: 16),
-                          label: const Text('REVERTIR', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold), maxLines: 1, overflow: TextOverflow.ellipsis),
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: AppTheme.textSecondary,
-                            padding: const EdgeInsets.symmetric(horizontal: 8),
-                            side: BorderSide(color: AppTheme.dividerColor),
-                            minimumSize: const Size(0, 40),
-                          ),
-                        ),
-                ),
+                if (!isPaid)
+                  _buildActionButton(
+                    icon: Icons.check_circle_outline,
+                    color: AppTheme.secondaryColor,
+                    label: 'Pagar',
+                    onTap: () => _confirmPago(context, p, provider),
+                  ),
+                if (isPaid)
+                  _buildActionButton(
+                    icon: Icons.history,
+                    color: AppTheme.textSecondary,
+                    label: 'Revertir',
+                    onTap: () => _confirmAction(context, title: 'Revertir Pago', message: '¿Estás seguro de REVERTIR el pago de ${p.nombre}?', onConfirm: () => provider.marcarPago(p.id, false)),
+                  ),
               ],
             ),
           ],
@@ -572,8 +647,8 @@ class _SalesListScreenState extends State<SalesListScreen> {
             title: Column(
               children: [
                 const Text('Registrar Abono'),
-                Text(
-                  '${p.nombre}',
+                  Text(
+                  p.nombre,
                   style: const TextStyle(fontSize: 14, fontWeight: FontWeight.normal),
                 ),
               ],
@@ -608,8 +683,8 @@ class _SalesListScreenState extends State<SalesListScreen> {
                     ),
                   ),
                   const SizedBox(height: 12),
-                  DropdownButtonFormField<String>(
-                    value: metodoPago,
+                    DropdownButtonFormField<String>(
+                    initialValue: metodoPago,
                     decoration: const InputDecoration(
                       labelText: 'Método de pago',
                       border: OutlineInputBorder(),

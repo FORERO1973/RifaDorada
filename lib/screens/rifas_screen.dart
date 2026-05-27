@@ -9,6 +9,7 @@ import '../providers/rifa_provider.dart';
 import '../models/rifa.dart';
 import '../models/participante.dart';
 import '../services/firebase_service.dart';
+import '../services/report_service.dart';
 import '../widgets/rifa_card.dart';
 import '../widgets/edit_rifa_dialog.dart';
 import 'crear_rifa_screen.dart';
@@ -414,6 +415,9 @@ class _RifaDetalleScreen extends StatefulWidget {
 class _RifaDetalleScreenState extends State<_RifaDetalleScreen> {
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
+  String _filterVendedor = 'Todos';
+  List<Map<String, dynamic>> _vendedores = [];
+  final Map<String, String> _vendedorNames = {};
 
   @override
   void initState() {
@@ -424,6 +428,7 @@ class _RifaDetalleScreenState extends State<_RifaDetalleScreen> {
       if (rifa != null) {
         provider.loadParticipantes(rifa.id);
         provider.loadNumeros(rifa.id);
+        _loadVendedores(rifa.id);
       }
     });
   }
@@ -434,6 +439,27 @@ class _RifaDetalleScreenState extends State<_RifaDetalleScreen> {
     super.dispose();
   }
 
+  Future<void> _loadVendedores(String rifaId) async {
+    final stats = await context.read<RifaProvider>().getVendedorStats(rifaId: rifaId);
+    final vendedores = stats['vendedores'] as List<dynamic>? ?? [];
+    if (mounted) {
+      setState(() {
+        _vendedores = vendedores.map((v) => v as Map<String, dynamic>).toList();
+        for (final v in _vendedores) {
+          final vid = v['vendedorId'] as String? ?? '';
+          final nombre = v['nombre'] as String? ?? vid;
+          _vendedorNames[vid] = nombre;
+        }
+      });
+    }
+  }
+
+  String _resolveVendedorName(Participante p) {
+    final vid = (p.vendedorId?.isNotEmpty == true) ? p.vendedorId! : 'admin';
+    if (p.creadoPorNombre?.isNotEmpty == true) return p.creadoPorNombre!;
+    return _vendedorNames[vid] ?? (vid == 'admin' ? 'Admin' : vid);
+  }
+
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<RifaProvider>();
@@ -442,9 +468,12 @@ class _RifaDetalleScreenState extends State<_RifaDetalleScreen> {
     if (rifa == null) return const Scaffold(body: Center(child: Text('Error: No hay rifa')));
 
     final filteredParticipantes = provider.participantes.where((p) {
-      return p.nombre.toLowerCase().contains(_searchQuery.toLowerCase()) ||
-             p.whatsapp.contains(_searchQuery) ||
-             p.numeros.any((n) => n.contains(_searchQuery));
+      final matchesSearch = p.nombre.toLowerCase().contains(_searchQuery.toLowerCase()) ||
+              p.whatsapp.contains(_searchQuery) ||
+              p.numeros.any((n) => n.contains(_searchQuery));
+      final vid = (p.vendedorId?.isNotEmpty == true) ? p.vendedorId : 'admin';
+      final matchesVendedor = _filterVendedor == 'Todos' || vid == _filterVendedor;
+      return matchesSearch && matchesVendedor;
     }).toList();
 
     return Scaffold(
@@ -521,9 +550,46 @@ class _RifaDetalleScreenState extends State<_RifaDetalleScreen> {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             const Text('Participantes', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            IconButton(
-              icon: const Icon(Icons.file_download_rounded, color: AppTheme.primaryColor),
-              onPressed: () => provider.exportarDatosCSV(),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (_vendedores.isNotEmpty)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 0),
+                    decoration: BoxDecoration(
+                      color: AppTheme.cardColor,
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: AppTheme.dividerColor),
+                    ),
+                    child: DropdownButtonHideUnderline(
+                      child: DropdownButton<String>(
+                        value: _filterVendedor,
+                        isDense: true,
+                        dropdownColor: AppTheme.cardColor,
+                        icon: const Icon(Icons.arrow_drop_down_rounded, color: AppTheme.primaryColor, size: 16),
+                        items: [
+                          const DropdownMenuItem(value: 'Todos', child: Text('Todos', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11))),
+                          ..._vendedores.map((v) {
+                            final vid = v['vendedorId'] as String? ?? '';
+                            final nombre = v['nombre'] as String? ?? (vid == 'admin' ? 'Admin' : vid);
+                            return DropdownMenuItem<String>(
+                              value: vid,
+                              child: Text(nombre, style: const TextStyle(fontSize: 11), overflow: TextOverflow.ellipsis),
+                            );
+                          }),
+                        ],
+                        onChanged: (val) {
+                          if (val != null) setState(() => _filterVendedor = val);
+                        },
+                      ),
+                    ),
+                  ),
+                IconButton(
+                  icon: const Icon(Icons.file_download_rounded, color: AppTheme.primaryColor),
+                  tooltip: 'Exportar reporte',
+                  onPressed: () => _showExportDialog(context, provider),
+                ),
+              ],
             ),
           ],
         ),
@@ -601,6 +667,21 @@ class _RifaDetalleScreenState extends State<_RifaDetalleScreen> {
                         children: [
                           Text(p.nombre, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                           Text('WhatsApp: ${p.whatsapp}', style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary)),
+                          if (_vendedorNames.isNotEmpty)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 2),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.person_outline_rounded, size: 12, color: AppTheme.primaryColor),
+                                  const SizedBox(width: 3),
+                                  Text(
+                                    _resolveVendedorName(p),
+                                    style: TextStyle(fontSize: 10, color: AppTheme.primaryColor, fontWeight: FontWeight.w600),
+                                  ),
+                                ],
+                              ),
+                            ),
                         ],
                       ),
                     ),
@@ -636,32 +717,34 @@ class _RifaDetalleScreenState extends State<_RifaDetalleScreen> {
                   alignment: WrapAlignment.end,
                   children: [
                     if (provider.isAdmin)
-                      _buildIconAction(icon: Icons.delete_outline, color: AppTheme.errorColor, onTap: () => _confirmDelete(p, provider)),
-                    _buildIconAction(icon: Icons.message_outlined, color: Colors.green, onTap: () => _contactWhatsApp(p, rifa)),
+                      _buildIconAction(icon: Icons.delete_outline, color: AppTheme.errorColor, label: 'Eliminar', onTap: () => _confirmDelete(p, provider)),
+                    _buildIconAction(icon: Icons.message_outlined, color: Colors.green, label: 'WhatsApp', onTap: () => _contactWhatsApp(p, rifa)),
                     _buildIconAction(
                       icon: Icons.confirmation_number_outlined,
                       color: AppTheme.primaryColor,
+                      label: 'Ticket',
                       onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => TicketScreen(participante: p, rifa: rifa)))
                     ),
                     if (!isPaid)
                       _buildIconAction(
                         icon: Icons.add_card_rounded,
                         color: Colors.purple,
+                        label: 'Abono',
                         onTap: () => _showAbonoDialog(context, p, provider, rifa),
                       ),
                     if (!isPaid)
-                      ElevatedButton.icon(
-                        onPressed: () => _confirmPago(context, p, provider),
-                        icon: const Icon(Icons.check_circle_outline, size: 16),
-                        label: const Text('PAGAR', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
-                        style: ElevatedButton.styleFrom(backgroundColor: AppTheme.secondaryColor, foregroundColor: Colors.white, minimumSize: const Size(80, 36), padding: const EdgeInsets.symmetric(horizontal: 10)),
+                      _buildIconAction(
+                        icon: Icons.check_circle_outline,
+                        color: AppTheme.secondaryColor,
+                        label: 'Pagar',
+                        onTap: () => _confirmPago(context, p, provider),
                       )
                     else
-                      OutlinedButton.icon(
-                        onPressed: () => _confirmAction(context, 'Revertir Pago', '¿Estás seguro de REVERTIR el pago de ${p.nombre}?', () => provider.marcarPago(p.id, false)),
-                        icon: const Icon(Icons.history, size: 16),
-                        label: const Text('REVERTIR', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
-                        style: OutlinedButton.styleFrom(foregroundColor: AppTheme.textSecondary, side: const BorderSide(color: AppTheme.dividerColor), minimumSize: const Size(80, 36), padding: const EdgeInsets.symmetric(horizontal: 10)),
+                      _buildIconAction(
+                        icon: Icons.history,
+                        color: AppTheme.textSecondary,
+                        label: 'Revertir',
+                        onTap: () => _confirmAction(context, 'Revertir Pago', '¿Estás seguro de REVERTIR el pago de ${p.nombre}?', () => provider.marcarPago(p.id, false)),
                       ),
                   ],
                 ),
@@ -673,14 +756,23 @@ class _RifaDetalleScreenState extends State<_RifaDetalleScreen> {
     );
   }
 
-  Widget _buildIconAction({required IconData icon, required Color color, required VoidCallback onTap}) {
+  Widget _buildIconAction({required IconData icon, required Color color, required VoidCallback onTap, String label = ''}) {
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(10),
       child: Container(
-        padding: const EdgeInsets.all(8),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
         decoration: BoxDecoration(border: Border.all(color: color.withValues(alpha: 0.3)), borderRadius: BorderRadius.circular(10)),
-        child: Icon(icon, color: color, size: 18),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, color: color, size: 18),
+            if (label.isNotEmpty) ...[
+              const SizedBox(height: 2),
+              Text(label, style: TextStyle(fontSize: 8, fontWeight: FontWeight.w700, color: color)),
+            ],
+          ],
+        ),
       ),
     );
   }
@@ -1019,6 +1111,63 @@ class _RifaDetalleScreenState extends State<_RifaDetalleScreen> {
               }
             },
             child: const Text('ELIMINAR'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showExportDialog(BuildContext context, RifaProvider provider) {
+    final rifa = provider.rifaSeleccionada;
+    if (rifa == null) return;
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        backgroundColor: AppTheme.cardColor,
+        title: const Text('Exportar Reporte'),
+        content: const Text('Selecciona el formato:'),
+        actions: [
+          TextButton.icon(
+            onPressed: () { Navigator.pop(ctx); provider.exportarDatosCSV(rifaId: rifa.id, nombreRifa: rifa.nombre); },
+            icon: const Icon(Icons.table_chart_rounded, size: 18),
+            label: const Text('Excel'),
+          ),
+          ElevatedButton.icon(
+            onPressed: () async {
+              Navigator.pop(ctx);
+              final auth = context.read<AuthProvider>();
+              final config = await FirebaseService.instance.getAppConfig(organizacionId: auth.organizacionId);
+              final participantes = await FirebaseService.instance.getParticipantesOnce(rifa.id);
+              final numerosMap = await FirebaseService.instance.getNumeros(rifa.id);
+              final numerosEstado = numerosMap.map((k, v) => MapEntry(k, v.estado.name));
+              if (participantes.isEmpty) return;
+              try {
+                await ReportService.instance.generatePdfReport(
+                  rifa: rifa,
+                  participantes: participantes,
+                  organizacion: config?.organizacion,
+                  numerosEstado: numerosEstado,
+                );
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('✅ PDF exportado: ${rifa.nombre}')),
+                  );
+                }
+              } catch (e) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('⚠️ Error: $e'), backgroundColor: Colors.orange),
+                  );
+                }
+              }
+            },
+            icon: const Icon(Icons.picture_as_pdf_rounded, size: 18),
+            label: const Text('PDF'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red.shade700,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
           ),
         ],
       ),
