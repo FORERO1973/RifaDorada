@@ -74,7 +74,7 @@ class _TicketScreenState extends State<TicketScreen> {
       await Future.delayed(const Duration(milliseconds: 800));
 
       final Uint8List? image = await _screenshotController.capture(
-        pixelRatio: 2.0,
+        pixelRatio: 1.0,
       );
       if (image == null) {
         debugPrint('[AUTO_SEND] Screenshot capture returned null');

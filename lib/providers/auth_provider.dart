@@ -14,6 +14,9 @@ class AuthProvider extends ChangeNotifier {
   String? _error;
   bool _initialized = false;
 
+  String? _adminEmail;
+  String? _adminPassword;
+
   AuthProvider({
     FirebaseAuth? auth,
     FirebaseFirestore? firestore,
@@ -101,6 +104,9 @@ class AuthProvider extends ChangeNotifier {
         if (_currentUser == null) {
           await _auth.signOut();
           _error = '⚠️ Usuario no encontrado en la base de datos. Contacta al administrador.';
+        } else if (_currentUser!.esAdmin || _currentUser!.esSuperAdmin) {
+          _adminEmail = email;
+          _adminPassword = password;
         }
       }
       _isLoading = false;
@@ -196,6 +202,8 @@ class AuthProvider extends ChangeNotifier {
     await _auth.signOut();
     _currentUser = null;
     _currentOrg = null;
+    _adminEmail = null;
+    _adminPassword = null;
     notifyListeners();
   }
 
@@ -307,12 +315,16 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  Future<bool> createVendedor({
+  Future<String?> createVendedor({
     required String nombre,
     required String email,
     required String password,
   }) async {
-    if (_currentUser?.organizacionId == null) return false;
+    if (_currentUser?.organizacionId == null) return 'No hay organización activa';
+
+    if (password.length < 6) {
+      return 'La contraseña debe tener al menos 6 caracteres';
+    }
 
     try {
       final cred = await _auth.createUserWithEmailAndPassword(
@@ -330,10 +342,25 @@ class AuthProvider extends ChangeNotifier {
         fechaCreacion: DateTime.now(),
       );
       await _firestore.collection('users').doc(uid).set(vendedor.toMap());
-      return true;
+
+      // Restore admin session (createUserWithEmailAndPassword signs in as the new user)
+      if (_adminEmail != null && _adminPassword != null) {
+        await _auth.signInWithEmailAndPassword(
+          email: _adminEmail!,
+          password: _adminPassword!,
+        );
+      }
+
+      return null; // null = éxito
     } catch (e) {
       debugPrint('[AUTH] Error creating vendedor: $e');
-      return false;
+      final msg = e.toString();
+      if (msg.contains('weak-password')) return 'Contraseña muy débil (mínimo 6 caracteres)';
+      if (msg.contains('email-already-in-use')) return 'Este correo ya está registrado';
+      if (msg.contains('invalid-email')) return 'Correo electrónico inválido';
+      if (msg.contains('network-request-failed')) return 'Error de red. Verifica tu conexión';
+      if (msg.contains('RECAPTCHA')) return 'Error de verificación Android. Agrega el SHA-1 en Firebase Console';
+      return 'Error al crear vendedor: $e';
     }
   }
 

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:http/http.dart' as http;
+import 'package:qr_flutter/qr_flutter.dart';
 import '../config/theme.dart';
 import '../config/constants.dart';
 import '../providers/auth_provider.dart';
@@ -27,7 +28,7 @@ class _ConfiguracionScreenState extends State<ConfiguracionScreen> {
   bool? _connectionSuccess;
 
   String _botStatus = 'unknown';
-  String? _botQrBase64;
+  String? _botQrData;
   DateTime? _botLastCheck;
   Timer? _statusPollTimer;
 
@@ -137,17 +138,48 @@ class _ConfiguracionScreenState extends State<ConfiguracionScreen> {
     try {
       final url = _chatbotUrlController.text.trim();
       final cleanUrl = url.endsWith('/') ? url.substring(0, url.length - 1) : url;
-      final testUri = '$cleanUrl/v1/rifas';
-      debugPrint('[CONFIG] Probando conexión a: $testUri');
       final apiKey = _botApiKeyController.text.trim();
       final headers = <String, String>{'Content-Type': 'application/json'};
       if (apiKey.isNotEmpty) headers['X-API-Key'] = apiKey;
-      final response = await http.get(Uri.parse(testUri), headers: headers).timeout(const Duration(seconds: 5));
-      if (response.statusCode == 200) {
-        setState(() { _connectionSuccess = true; _connectionStatus = '✅ Conexión exitosa'; });
-      } else {
-        setState(() { _connectionSuccess = false; _connectionStatus = '❌ Error: Servidor respondió ${response.statusCode}'; });
+
+      // Test 1: Check server is alive
+      final statusUri = '$cleanUrl/v1/status';
+      debugPrint('[CONFIG] Probando estado a: $statusUri');
+      final statusResponse = await http.get(Uri.parse(statusUri), headers: headers).timeout(const Duration(seconds: 5));
+
+      if (statusResponse.statusCode != 200) {
+        setState(() { _connectionSuccess = false; _connectionStatus = '❌ Servidor no responde (${statusResponse.statusCode})'; });
+        return;
       }
+
+      // Parse WhatsApp connection status
+      final decoded = jsonDecode(statusResponse.body);
+      final waStatus = decoded['status'] as String? ?? 'unknown';
+
+      String waEmoji;
+      String waText;
+      switch (waStatus) {
+        case 'connected':
+          waEmoji = '✅';
+          waText = 'WhatsApp CONECTADO';
+          break;
+        case 'qr_pending':
+          waEmoji = '📱';
+          waText = 'WhatsApp esperando código QR';
+          break;
+        case 'disconnected':
+          waEmoji = '❌';
+          waText = 'WhatsApp DESCONECTADO';
+          break;
+        default:
+          waEmoji = '⚠️';
+          waText = 'WhatsApp: $waStatus';
+      }
+
+      setState(() {
+        _connectionSuccess = waStatus == 'connected';
+        _connectionStatus = '$waEmoji $waText';
+      });
     } catch (e) {
       debugPrint('[CONFIG] Error de conexión: $e');
       setState(() { _connectionSuccess = false; _connectionStatus = '❌ $e'; });
@@ -191,7 +223,7 @@ class _ConfiguracionScreenState extends State<ConfiguracionScreen> {
         final data = jsonDecode(response.body);
         setState(() {
           _botStatus = data['status'] ?? 'unknown';
-          _botQrBase64 = data['qr'];
+          _botQrData = data['qr'];
           _botLastCheck = DateTime.now();
         });
       }
@@ -206,7 +238,7 @@ class _ConfiguracionScreenState extends State<ConfiguracionScreen> {
   }
 
   void _showQrDialog() {
-    if (_botQrBase64 == null) return;
+    if (_botQrData == null || _botQrData!.isEmpty) return;
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -228,15 +260,16 @@ class _ConfiguracionScreenState extends State<ConfiguracionScreen> {
                 borderRadius: BorderRadius.circular(12),
               ),
               padding: const EdgeInsets.all(12),
-              child: Image.memory(
-                base64Decode(_botQrBase64!.split(',').last),
-                width: 250,
-                height: 250,
+              child: QrImageView(
+                data: _botQrData!,
+                version: QrVersions.auto,
+                size: 250,
+                backgroundColor: Colors.white,
               ),
             ),
             const SizedBox(height: 12),
             Text(
-              'Abre WhatsApp → Menú → Dispositivos vinculados',
+              'Abre WhatsApp > Menú > Dispositivos vinculados',
               style: GoogleFonts.outfit(fontSize: 12, color: AppTheme.textSecondary),
               textAlign: TextAlign.center,
             ),

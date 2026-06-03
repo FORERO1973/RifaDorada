@@ -10,7 +10,7 @@ class AppConstants {
   static const String countryCode = '+57';
   static const String timezone = 'America/Bogota';
 
-  static const String _defaultChatbotUrl = 'https://squeak-unlocking-absolve.ngrok-free.dev';
+  static const String _defaultChatbotUrl = 'https://rifadorada-bot.onrender.com';
   static const String _chatbotUrlKey = 'chatbot_url';
   static const String _apiKeyKey = 'bot_api_key';
 

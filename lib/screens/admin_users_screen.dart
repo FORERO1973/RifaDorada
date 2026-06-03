@@ -187,14 +187,14 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                 }
                 setState(() => isLoading = true);
                 final auth = context.read<AuthProvider>();
-                final success = await auth.createVendedor(
+                final errorMsg = await auth.createVendedor(
                   nombre: nombreCtrl.text.trim(),
                   email: emailCtrl.text.trim(),
                   password: passCtrl.text,
                 );
                 if (ctx.mounted) {
                   Navigator.pop(ctx);
-                  if (success) {
+                  if (errorMsg == null) {
                     await _loadUsers();
                     if (context.mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(
@@ -204,7 +204,7 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                   } else {
                     if (context.mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('⚠️ Error al crear vendedor'), backgroundColor: Colors.orange),
+                        SnackBar(content: Text('⚠️ $errorMsg'), backgroundColor: Colors.orange),
                       );
                     }
                   }

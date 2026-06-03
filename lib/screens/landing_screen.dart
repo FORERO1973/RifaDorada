@@ -120,7 +120,7 @@ class _LandingScreenState extends State<LandingScreen>
   }
 
   Future<void> _loadChatbotUrl() async {
-    _chatbotUrl = 'https://squeak-unlocking-absolve.ngrok-free.dev';
+    _chatbotUrl = 'https://rifadorada-bot.onrender.com';
     debugPrint('[LANDING] Chatbot URL: $_chatbotUrl');
   }
 

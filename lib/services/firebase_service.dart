@@ -1075,6 +1075,9 @@ class FirebaseService {
 
   Future<bool> enviarTicketConImagen(String whatsapp, String message, String? imageBase64) async {
     try {
+      final sizeKB = (imageBase64?.length ?? 0) / 1024;
+      debugPrint('[SYNC] Enviando ticket con imagen a $whatsapp (base64: ${sizeKB.toStringAsFixed(1)} KB)');
+
       final response = await http.post(
         Uri.parse('${AppConstants.chatbotApi}/messages'),
         headers: _botHeaders(),
@@ -1088,7 +1091,7 @@ class FirebaseService {
         debugPrint('[SYNC] Ticket con imagen enviado al cliente');
         return true;
       }
-      debugPrint('[SYNC] Error: chatbot respondió ${response.statusCode}');
+      debugPrint('[SYNC] Error: chatbot respondió ${response.statusCode} - ${response.body}');
       return false;
     } catch (e) {
       debugPrint('[SYNC] Error enviando ticket con imagen: $e');

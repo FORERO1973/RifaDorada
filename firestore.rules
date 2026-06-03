@@ -39,10 +39,12 @@ service cloud.firestore {
 
     // ===== users collection =====
     match /users/{uid} {
-      // Users can read their own data; superAdmin can read all
-      allow read: if isAuth() && (request.auth.uid == uid || isSuperAdmin());
-      // Users can update their own non-role data; only superAdmin can change roles
-      allow create: if isSuperAdmin();
+      allow read: if isAuth() && (
+        request.auth.uid == uid ||
+        isSuperAdmin() ||
+        getUserRole() == 'orgAdmin'
+      );
+      allow create: if isSuperAdmin() || getUserRole() == 'orgAdmin' || request.auth.uid == uid;
       allow update: if (isAuth() && request.auth.uid == uid && request.resource.data.rol == resource.data.rol)
                     || isSuperAdmin();
       allow delete: if isSuperAdmin();
@@ -72,11 +74,8 @@ service cloud.firestore {
 
     // ===== participantes collection =====
     match /participantes/{participanteId} {
-      // superAdmin can read/write all; org members can read/write participants in their org
-      allow read: if isSuperAdmin() || (isAuth() && canManageOrg(resource.data.organizacionId));
-      // vendedor can create participants; orgAdmin/superAdmin can also create
+      allow read: if isAuth() && (isSuperAdmin() || getUserRole() == 'orgAdmin' || getUserRole() == 'vendedor');
       allow create: if isAuth() && (isSuperAdmin() || getUserRole() == 'orgAdmin' || getUserRole() == 'vendedor');
-      // Only orgAdmin and superAdmin can update/delete participants
       allow update, delete: if isOrgAdmin();
     }
 
