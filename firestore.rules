@@ -60,22 +60,21 @@ service cloud.firestore {
 
     // ===== rifas collection =====
     match /rifas/{rifaId} {
-      // superAdmin can read/write all; org members can read/write rifas in their org
-      allow read: if isSuperAdmin() || (isAuth() && canManageOrg(resource.data.organizacionId));
+      allow read: if !isAuth() || isSuperAdmin() || (isAuth() && canManageOrg(resource.data.organizacionId));
       allow create: if isOrgAdmin();
       allow update, delete: if isSuperAdmin() || (isAuth() && getUserRole() == 'orgAdmin' && isSameOrg(resource.data.organizacionId));
 
       // ===== rifas/{rifaId}/numeros subcollection =====
       match /numeros/{numero} {
-        allow read: if isSuperAdmin() || (isAuth() && canManageOrg(get(/databases/$(database)/documents/rifas/$(rifaId)).data.organizacionId));
-        allow write: if isSuperAdmin() || (isAuth() && getUserRole() == 'orgAdmin' && isSameOrg(get(/databases/$(database)/documents/rifas/$(rifaId)).data.organizacionId));
+        allow read: if !isAuth() || isSuperAdmin() || (isAuth() && canManageOrg(get(/databases/$(database)/documents/rifas/$(rifaId)).data.organizacionId));
+        allow write: if !isAuth() || isSuperAdmin() || (isAuth() && getUserRole() == 'orgAdmin' && isSameOrg(get(/databases/$(database)/documents/rifas/$(rifaId)).data.organizacionId));
       }
     }
 
     // ===== participantes collection =====
     match /participantes/{participanteId} {
-      allow read: if isAuth() && (isSuperAdmin() || getUserRole() == 'orgAdmin' || getUserRole() == 'vendedor');
-      allow create: if isAuth() && (isSuperAdmin() || getUserRole() == 'orgAdmin' || getUserRole() == 'vendedor');
+      allow read: if !isAuth() || (isAuth() && (isSuperAdmin() || getUserRole() == 'orgAdmin' || getUserRole() == 'vendedor'));
+      allow create: if !isAuth() || (isAuth() && (isSuperAdmin() || getUserRole() == 'orgAdmin' || getUserRole() == 'vendedor'));
       allow update, delete: if isOrgAdmin();
     }
 

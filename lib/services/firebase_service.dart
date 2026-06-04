@@ -1018,6 +1018,8 @@ class FirebaseService {
   }
 
   Future<void> _notifySaleToChatbot(String rifaId, List<String> numeros, Participante participante, double total) async {
+    if (participante.botNotified) return;
+
     try {
       final estadoPago = participante.estadoPago == EstadoPago.pagado ? 'pagado' : 'pendiente';
       final restante = total - participante.totalPagado;
@@ -1058,18 +1060,37 @@ class FirebaseService {
         '🍀 *¡Mucha suerte!*',
       ].join('\n');
 
-      await http.post(
-        Uri.parse('${AppConstants.chatbotApi}/send/wa'),
-        headers: _botHeaders(),
-        body: jsonEncode({
-          'number': participante.whatsappFormateado,
-          'message': mensajeTicket,
-          'organizacionId': participante.organizacionId ?? '',
-        }),
-      );
-      debugPrint('[SYNC] Ticket enviado al cliente por WhatsApp');
+      // Retry up to 3 times
+      int retries = 0;
+      while (retries < 3) {
+        try {
+          final response = await http.post(
+            Uri.parse('${AppConstants.chatbotApi}/send/wa'),
+            headers: _botHeaders(),
+            body: jsonEncode({
+              'number': participante.whatsappFormateado,
+              'message': mensajeTicket,
+              'organizacionId': participante.organizacionId ?? '',
+            }),
+          );
+          if (response.statusCode == 200) {
+            debugPrint('[SYNC] Ticket enviado al cliente por WhatsApp');
+            // Mark as notified
+            await _firestore!
+                .collection('participantes')
+                .doc(participante.id)
+                .update({'bot_notified': true});
+            break;
+          }
+          debugPrint('[SYNC] Chatbot respondió ${response.statusCode}, reintento ${retries + 1}');
+        } catch (e) {
+          debugPrint('[SYNC] Error en intento ${retries + 1}: $e');
+        }
+        retries++;
+        if (retries < 3) await Future.delayed(Duration(seconds: 1 << retries));
+      }
     } catch (e) {
-      debugPrint('[SYNC] Error enviando ticket al chatbot: $e');
+      debugPrint('[SYNC] Error en _notifySaleToChatbot: $e');
     }
   }
 

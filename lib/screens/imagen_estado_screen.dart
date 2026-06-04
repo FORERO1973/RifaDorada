@@ -168,7 +168,6 @@ class _ImagenEstadoScreenState extends State<ImagenEstadoScreen> {
       appBar: AppBar(
         title: const Text('Estado de Números'),
         actions: [
-          if (rifa.tipoRifa == '2 cifras') ...[
             IconButton(
               icon: _isUploading
                 ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
@@ -183,7 +182,6 @@ class _ImagenEstadoScreenState extends State<ImagenEstadoScreen> {
               onPressed: _isSharing ? null : () => _shareImage(rifa),
               tooltip: 'Compartir Imagen',
             ),
-          ],
         ],
       ),
       body: SingleChildScrollView(

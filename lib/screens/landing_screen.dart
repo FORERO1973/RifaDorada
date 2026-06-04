@@ -156,25 +156,60 @@ class _LandingScreenState extends State<LandingScreen>
         );
       }).toList();
 
-      final partMap = <String, List<Map<String, dynamic>>>{};
+      // Build occupancy map from participantes + numeros subcollection
+      final futures = <Future>[];
       for (final rifa in rifas) {
-        final partSnapshot = await FirebaseFirestore.instance
+        futures.add(FirebaseFirestore.instance
             .collection('participantes')
             .where('rifaId', isEqualTo: rifa.id)
-            .get();
+            .get());
+        futures.add(FirebaseFirestore.instance
+            .collection('rifas')
+            .doc(rifa.id)
+            .collection('numeros')
+            .get());
+      }
+      final results = await Future.wait(futures);
 
-        final entries = <Map<String, dynamic>>[];
+      final partMap = <String, List<Map<String, dynamic>>>{};
+      for (int i = 0; i < rifas.length; i++) {
+        final rifa = rifas[i];
+        final partSnapshot = results[i * 2] as QuerySnapshot<Map<String, dynamic>>;
+        final numerosSnapshot = results[i * 2 + 1] as QuerySnapshot<Map<String, dynamic>>;
+
+        // Primary: numeros subcollection (authoritative)
+        final entries = <String, String>{};
+        for (final doc in numerosSnapshot.docs) {
+          final data = doc.data();
+          final estado = data['estado'] as String? ?? 'disponible';
+          if (estado == 'reservado') {
+            entries[doc.id] = 'pendiente';
+          } else if (estado == 'pagado') {
+            entries[doc.id] = 'pagado';
+          }
+        }
+
+        // Secondary: participantes (for abonado detection)
         for (final doc in partSnapshot.docs) {
           final data = doc.data();
           final nums = data['numeros'] as List?;
           final estado = data['estadoPago'] as String? ?? 'pendiente';
           if (nums != null) {
             for (final n in nums) {
-              entries.add({'numero': n.toString(), 'estado': estado});
+              final numStr = n.toString();
+              if (estado == 'abonado') {
+                entries[numStr] = 'abonado';
+              }
+              if (!entries.containsKey(numStr)) {
+                entries[numStr] = estado;
+              }
             }
           }
         }
-        partMap[rifa.id] = entries;
+
+        partMap[rifa.id] = entries.entries
+            .map((e) => {'numero': e.key, 'estado': e.value})
+            .toList();
       }
 
       String configWhatsapp = '573001234567';
@@ -265,22 +300,50 @@ class _LandingScreenState extends State<LandingScreen>
 
   Future<void> _refreshRaffleData(Rifa rifa) async {
     try {
+      // Primary: numeros subcollection (authoritative)
+      final numerosSnapshot = await FirebaseFirestore.instance
+          .collection('rifas')
+          .doc(rifa.id)
+          .collection('numeros')
+          .get();
+
+      final entriesMap = <String, String>{};
+      for (final doc in numerosSnapshot.docs) {
+        final data = doc.data();
+        final estado = data['estado'] as String? ?? 'disponible';
+        if (estado == 'reservado') {
+          entriesMap[doc.id] = 'pendiente';
+        } else if (estado == 'pagado') {
+          entriesMap[doc.id] = 'pagado';
+        }
+      }
+
+      // Secondary: participantes (for abonado detection)
       final partSnapshot = await FirebaseFirestore.instance
           .collection('participantes')
           .where('rifaId', isEqualTo: rifa.id)
           .get();
 
-      final entries = <Map<String, dynamic>>[];
       for (final doc in partSnapshot.docs) {
         final data = doc.data();
         final nums = data['numeros'] as List?;
         final estado = data['estadoPago'] as String? ?? 'pendiente';
         if (nums != null) {
           for (final n in nums) {
-            entries.add({'numero': n.toString(), 'estado': estado});
+            final numStr = n.toString();
+            if (estado == 'abonado') {
+              entriesMap[numStr] = 'abonado';
+            }
+            if (!entriesMap.containsKey(numStr)) {
+              entriesMap[numStr] = estado;
+            }
           }
         }
       }
+
+      final entries = entriesMap.entries
+          .map((e) => {'numero': e.key, 'estado': e.value})
+          .toList();
 
       if (mounted) {
         setState(() {
@@ -380,6 +443,22 @@ class _LandingScreenState extends State<LandingScreen>
       });
 
       participantId = docRef.id;
+
+      // Also write to numeros subcollection
+      final batch = FirebaseFirestore.instance.batch();
+      for (final num in _selectedNumbers) {
+        final numRef = FirebaseFirestore.instance
+            .collection('rifas')
+            .doc(_selectedRifa!.id)
+            .collection('numeros')
+            .doc(num);
+        batch.set(numRef, {
+          'estado': 'reservado',
+          'participanteId': participantId,
+          'rifaId': _selectedRifa!.id,
+        });
+      }
+      await batch.commit();
 
       if (_chatbotUrl.isNotEmpty) {
         try {
