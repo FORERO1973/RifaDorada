@@ -523,7 +523,10 @@ class _LandingScreenState extends State<LandingScreen>
 
       await http.post(
         Uri.parse('$cleanUrl/v1/send/ticket'),
-        headers: {'Content-Type': 'application/json'},
+        headers: {
+          'Content-Type': 'application/json',
+          if (AppConstants.botApiKey.isNotEmpty) 'X-API-Key': AppConstants.botApiKey,
+        },
         body: jsonEncode({
           'whatsapp': whatsapp,
           'rifaId': _selectedRifa!.id,

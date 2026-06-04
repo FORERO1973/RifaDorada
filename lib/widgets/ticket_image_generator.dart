@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import '../config/constants.dart';
 
 class TicketImageGenerator {
   static Future<String?> generateTicketBase64({
@@ -57,6 +58,7 @@ class TicketImageGenerator {
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
+          if (AppConstants.botApiKey.isNotEmpty) 'X-API-Key': AppConstants.botApiKey,
         },
         body: body,
       ).timeout(const Duration(seconds: 15));

@@ -11,10 +11,11 @@ class AppConstants {
   static const String timezone = 'America/Bogota';
 
   static const String _defaultChatbotUrl = 'https://rifadorada-bot.onrender.com';
+  static const String _defaultApiKey = 'rifadorada-api-2026';
   static const String _chatbotUrlKey = 'chatbot_url';
   static const String _apiKeyKey = 'bot_api_key';
 
-  static String _apiKey = '';
+  static String _apiKey = _defaultApiKey;
 
   static String get botApiKey => _apiKey;
 
