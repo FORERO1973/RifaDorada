@@ -81,8 +81,8 @@ class RifasScreen extends StatelessWidget {
         ),
         body: TabBarView(
           children: [
-            _RifasActivasTab(),
-            _RifasCerradasTab(),
+            const _RifasActivasTab(),
+            const _RifasCerradasTab(),
           ],
         ),
       ),
@@ -91,6 +91,7 @@ class RifasScreen extends StatelessWidget {
 }
 
 class _RifasActivasTab extends StatefulWidget {
+  const _RifasActivasTab();
   @override
   State<_RifasActivasTab> createState() => _RifasActivasTabState();
 }
@@ -290,6 +291,7 @@ class _RifasActivasTabState extends State<_RifasActivasTab> {
 }
 
 class _RifasCerradasTab extends StatefulWidget {
+  const _RifasCerradasTab();
   @override
   State<_RifasCerradasTab> createState() => _RifasCerradasTabState();
 }

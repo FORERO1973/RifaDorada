@@ -62,6 +62,18 @@ class _AdminScreenState extends State<AdminScreen> {
                     'Crea una rifa desde la pantalla de Inicio',
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: AppTheme.textSecondary),
                   ),
+                  const SizedBox(height: 24),
+                  ElevatedButton.icon(
+                    onPressed: () => Navigator.of(context).pushReplacementNamed('/home'),
+                    icon: const Icon(Icons.add_circle_outline),
+                    label: const Text('Ir a Inicio y crear rifa'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppTheme.primaryColor,
+                      foregroundColor: AppTheme.backgroundColor,
+                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                  ),
                 ],
               ),
             );

@@ -67,14 +67,23 @@ service cloud.firestore {
       // ===== rifas/{rifaId}/numeros subcollection =====
       match /numeros/{numero} {
         allow read: if !isAuth() || isSuperAdmin() || (isAuth() && canManageOrg(get(/databases/$(database)/documents/rifas/$(rifaId)).data.organizacionId));
-        allow write: if !isAuth() || isSuperAdmin() || (isAuth() && getUserRole() == 'orgAdmin' && isSameOrg(get(/databases/$(database)/documents/rifas/$(rifaId)).data.organizacionId));
+        allow write: if !isAuth() || isSuperAdmin() || (isAuth() && getUserRole() == 'orgAdmin' && isSameOrg(get(/databases/$(database)/documents/rifas/$(rifaId)).data.organizacionId))
+          && request.resource.data.keys().hasAll(['estado', 'participanteId', 'rifaId'])
+          && request.resource.data.estado in ['disponible', 'reservado', 'pagado', 'ocupado'];
       }
     }
 
     // ===== participantes collection =====
     match /participantes/{participanteId} {
       allow read: if !isAuth() || (isAuth() && (isSuperAdmin() || getUserRole() == 'orgAdmin' || getUserRole() == 'vendedor'));
-      allow create: if !isAuth() || (isAuth() && (isSuperAdmin() || getUserRole() == 'orgAdmin' || getUserRole() == 'vendedor'));
+      allow create: if (!isAuth() || (isAuth() && (isSuperAdmin() || getUserRole() == 'orgAdmin' || getUserRole() == 'vendedor')))
+        && request.resource.data.keys().hasAll(['nombre', 'whatsapp', 'numeros', 'rifaId'])
+        && request.resource.data.numeros.size() > 0
+        && request.resource.data.numeros.size() <= 100
+        && request.resource.data.nombre is string
+        && request.resource.data.nombre.size() >= 2
+        && request.resource.data.whatsapp is string
+        && request.resource.data.whatsapp.matches('^[0-9+]{7,15}$');
       allow update, delete: if isOrgAdmin();
     }
 

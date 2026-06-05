@@ -104,7 +104,7 @@ class _SelectorNumerosViewState extends State<_SelectorNumerosView>
 
   void _startTimer() {
     _timer = Timer.periodic(const Duration(seconds: 4), (timer) {
-      if (_carouselPaused) return;
+      if (!mounted || _carouselPaused) return;
       if (_pageController.hasClients) {
         final provider = context.read<RifaProvider>();
         final imagesCount = provider.rifaSeleccionada?.imagenes.length ?? 0;

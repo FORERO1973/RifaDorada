@@ -4,21 +4,6 @@ import 'package:http/http.dart' as http;
 import '../config/constants.dart';
 
 class TicketImageGenerator {
-  static Future<String?> generateTicketBase64({
-    required String rifaNombre,
-    required String participanteNombre,
-    required String whatsapp,
-    required String ciudad,
-    required List<String> numeros,
-    required double precioNumero,
-    required String? loteria,
-    required String? fechaSorteo,
-    required String? organizacion,
-    required String participanteId,
-  }) async {
-    return null;
-  }
-
   static Future<bool> sendTicketImage({
     required String chatbotUrl,
     required String whatsapp,

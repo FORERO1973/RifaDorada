@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
@@ -12,6 +13,9 @@ import '../utils/web_helper.dart';
 
 class RifaProvider extends ChangeNotifier {
   final FirebaseService _firebaseService = FirebaseService.instance;
+
+  StreamSubscription? _rifasSubscription;
+  StreamSubscription? _numerosSubscription;
 
   List<Rifa> _rifas = [];
   List<Rifa> get rifas => _rifas;
@@ -71,8 +75,9 @@ class RifaProvider extends ChangeNotifier {
     _error = null;
     notifyListeners();
 
+    _rifasSubscription?.cancel();
     try {
-      _firebaseService.getRifas(organizacionId: _organizacionId).listen((rifas) {
+      _rifasSubscription = _firebaseService.getRifas(organizacionId: _organizacionId).listen((rifas) {
         _rifas = rifas;
         _isLoading = false;
         notifyListeners();
@@ -114,7 +119,8 @@ class RifaProvider extends ChangeNotifier {
   }
 
   void loadNumerosStream(String rifaId) {
-    _firebaseService.getNumerosStream(rifaId).listen((numeros) {
+    _numerosSubscription?.cancel();
+    _numerosSubscription = _firebaseService.getNumerosStream(rifaId).listen((numeros) {
       _numeros = numeros;
       notifyListeners();
     });
@@ -617,5 +623,12 @@ Map<String, dynamic> getEstadisticas() {
       _isLoading = false;
       notifyListeners();
     }
+  }
+
+  @override
+  void dispose() {
+    _rifasSubscription?.cancel();
+    _numerosSubscription?.cancel();
+    super.dispose();
   }
 }
