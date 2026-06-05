@@ -146,12 +146,37 @@ class _SelectorNumerosViewState extends State<_SelectorNumerosView>
     if (rifa == null || query.isEmpty) return;
 
     final number = int.tryParse(query);
-    if (number == null) return;
+    if (number == null || number < 0 || number >= rifa.cantidadNumeros) return;
+
+    // Switch to the correct range tab if needed
+    if (_ranges.isNotEmpty) {
+      int targetRange = _selectedRange;
+      for (int i = 0; i < _ranges.length; i++) {
+        final start = _ranges[i]['start'] as int;
+        final end = _ranges[i]['end'] as int;
+        if (number >= start && number <= end) {
+          targetRange = i;
+          break;
+        }
+      }
+
+      if (targetRange != _selectedRange) {
+        setState(() => _selectedRange = targetRange);
+        WidgetsBinding.instance.addPostFrameCallback((_) => _animateToNumber(number));
+        return;
+      }
+    }
+
+    _animateToNumber(number);
+  }
+
+  void _animateToNumber(int number) {
+    final rifa = context.read<RifaProvider>().rifaSeleccionada;
+    if (rifa == null) return;
 
     final rangeOffset = _ranges.isEmpty ? 0 : (_ranges[_selectedRange]['start'] as int);
     final index = number - rangeOffset;
-
-    if (index < 0 || index >= rifa.cantidadNumeros) return;
+    if (index < 0) return;
 
     final crossAxisCount = rifa.tipoRifa == '3 cifras' ? 6 : 10;
     final screenWidth = MediaQuery.of(context).size.width;
