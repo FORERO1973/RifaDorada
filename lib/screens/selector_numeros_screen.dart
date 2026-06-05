@@ -34,6 +34,7 @@ class _SelectorNumerosViewState extends State<_SelectorNumerosView>
     with SingleTickerProviderStateMixin {
   final PageController _pageController = PageController();
   final TextEditingController _searchController = TextEditingController();
+  final ScrollController _gridScrollController = ScrollController();
   int _currentPage = 0;
   String _searchQuery = '';
   bool _carouselPaused = false;
@@ -89,6 +90,7 @@ class _SelectorNumerosViewState extends State<_SelectorNumerosView>
     _timer?.cancel();
     _pageController.dispose();
     _searchController.dispose();
+    _gridScrollController.dispose();
     _pulseController.dispose();
     super.dispose();
   }
@@ -137,6 +139,36 @@ class _SelectorNumerosViewState extends State<_SelectorNumerosView>
       default:
         return true;
     }
+  }
+
+  void _scrollToNumber(String query) {
+    final rifa = context.read<RifaProvider>().rifaSeleccionada;
+    if (rifa == null || query.isEmpty) return;
+
+    final number = int.tryParse(query);
+    if (number == null) return;
+
+    final rangeOffset = _ranges.isEmpty ? 0 : (_ranges[_selectedRange]['start'] as int);
+    final index = number - rangeOffset;
+
+    if (index < 0 || index >= rifa.cantidadNumeros) return;
+
+    final crossAxisCount = rifa.tipoRifa == '3 cifras' ? 6 : 10;
+    final screenWidth = MediaQuery.of(context).size.width;
+    final availableWidth = screenWidth - 32.0;
+    final cellWidth = (availableWidth - (crossAxisCount - 1) * 6.0) / crossAxisCount;
+    final cellHeight = cellWidth / 1.0;
+    final rowHeight = cellHeight + 6.0;
+
+    final row = index ~/ crossAxisCount;
+    final targetOffset = row * rowHeight;
+    final maxScroll = _gridScrollController.position.maxScrollExtent;
+
+    _gridScrollController.animateTo(
+      targetOffset.clamp(0.0, maxScroll),
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeInOut,
+    );
   }
 
   @override
@@ -198,7 +230,10 @@ class _SelectorNumerosViewState extends State<_SelectorNumerosView>
                       child: TextField(
                         controller: _searchController,
                         keyboardType: TextInputType.number,
-                        onChanged: (value) => setState(() => _searchQuery = value),
+                        onChanged: (value) {
+                            setState(() => _searchQuery = value);
+                            _scrollToNumber(value);
+                          },
                         style: GoogleFonts.outfit(fontSize: 12),
                         decoration: InputDecoration(
                           hintText: 'Buscar número...',
@@ -240,7 +275,12 @@ class _SelectorNumerosViewState extends State<_SelectorNumerosView>
                         return Padding(
                           padding: const EdgeInsets.only(right: 6),
                           child: GestureDetector(
-                            onTap: () => setState(() => _selectedRange = index),
+                            onTap: () {
+                              setState(() => _selectedRange = index);
+                              if (_searchQuery.isNotEmpty) {
+                                WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToNumber(_searchQuery));
+                              }
+                            },
                             child: Container(
                               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                               decoration: BoxDecoration(
@@ -270,6 +310,7 @@ class _SelectorNumerosViewState extends State<_SelectorNumerosView>
           Expanded(
             child: RepaintBoundary(
               child: GridView.builder(
+                controller: _gridScrollController,
                 padding: const EdgeInsets.only(left: 16, right: 16, top: 4, bottom: 10),
                 addAutomaticKeepAlives: false,
                 addRepaintBoundaries: true,
