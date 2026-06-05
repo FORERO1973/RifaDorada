@@ -24,15 +24,22 @@ class _ConnectivityWrapperState extends State<ConnectivityWrapper> {
     super.initState();
     if (!_active) return;
     _checkInitial();
-    _connectivitySub = Connectivity().onConnectivityChanged.listen((results) {
-      final online = results.any((r) => r != ConnectivityResult.none);
-      if (online && !_isOnline) {
-        OfflineQueueService().processQueue();
-      }
-      if (mounted) setState(() => _isOnline = online);
-    });
-    _queueListener = _onQueueChanged;
-    OfflineQueueService().pendingCountNotifier.addListener(_queueListener!);
+    try {
+      _connectivitySub = Connectivity().onConnectivityChanged.listen((results) {
+        final online = results.any((r) => r != ConnectivityResult.none);
+        if (online && !_isOnline) {
+          OfflineQueueService().processQueue();
+        }
+        if (mounted) setState(() => _isOnline = online);
+      });
+    } catch (_) {
+      // connectivity_plus no disponible en esta plataforma
+      _isOnline = true;
+    }
+    try {
+      _queueListener = _onQueueChanged;
+      OfflineQueueService().pendingCountNotifier.addListener(_queueListener!);
+    } catch (_) {}
   }
 
   void _onQueueChanged() {
@@ -41,19 +48,25 @@ class _ConnectivityWrapperState extends State<ConnectivityWrapper> {
 
   Future<void> _checkInitial() async {
     if (!_active) return;
-    final results = await Connectivity().checkConnectivity();
-    if (mounted) {
-      setState(() => _isOnline = results.any((r) => r != ConnectivityResult.none));
+    try {
+      final results = await Connectivity().checkConnectivity();
+      if (mounted) {
+        setState(() => _isOnline = results.any((r) => r != ConnectivityResult.none));
+      }
+    } catch (_) {
+      if (mounted) setState(() => _isOnline = true);
     }
   }
 
   @override
   void dispose() {
     if (!_active) { super.dispose(); return; }
-    _connectivitySub?.cancel();
-    if (_queueListener != null) {
-      OfflineQueueService().pendingCountNotifier.removeListener(_queueListener!);
-    }
+    try { _connectivitySub?.cancel(); } catch (_) {}
+    try {
+      if (_queueListener != null) {
+        OfflineQueueService().pendingCountNotifier.removeListener(_queueListener!);
+      }
+    } catch (_) {}
     super.dispose();
   }
 

@@ -47,6 +47,11 @@ class OfflineQueueService {
     dynamic body,
     int maxRetries = 5,
   }) async {
+    // On web, always send directly (no offline support)
+    if (kIsWeb) {
+      return _doHttp(url, method, headers, body is String ? body : jsonEncode(body));
+    }
+
     if (_processing > 0) {
       return _queueIt(url, method, headers, body, maxRetries);
     }
@@ -57,7 +62,7 @@ class OfflineQueueService {
     }
 
     try {
-      final response = await _doHttp(url, method, headers, body);
+      final response = await _doHttp(url, method, headers, body is String ? body : jsonEncode(body));
       if (response.statusCode >= 200 && response.statusCode < 500) {
         return response;
       }
@@ -92,6 +97,8 @@ class OfflineQueueService {
 
   Future<void> processQueue() async {
     if (_queue.isEmpty || _processing > 0) return;
+    if (kIsWeb) { _queue.clear(); await _saveToDisk(); return; }
+
     _processing = 1;
 
     final items = List<Map<String, dynamic>>.from(_queue);
@@ -149,6 +156,7 @@ class OfflineQueueService {
   }
 
   Future<bool> _isOnline() async {
+    if (kIsWeb) return true;
     try {
       final result = await http
           .get(Uri.parse('https://clients3.google.com/generate_204'))
