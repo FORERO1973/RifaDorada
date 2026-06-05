@@ -16,6 +16,7 @@ import 'screens/vendedor_ventas_screen.dart';
 import 'screens/super_admin_screen.dart';
 import 'screens/landing_screen.dart';
 import 'widgets/ticket_image_generator.dart';
+import 'widgets/connectivity_wrapper.dart';
 
 class RifaDoradaApp extends StatelessWidget {
   const RifaDoradaApp({super.key});
@@ -26,7 +27,8 @@ class RifaDoradaApp extends StatelessWidget {
       builder: (context, themeProvider, child) {
         final isWeb = kIsWeb;
 
-        return MaterialApp(
+        return ConnectivityWrapper(
+          child: MaterialApp(
           navigatorKey: navigatorKey,
           title: 'RifaDorada',
           debugShowCheckedModeBanner: false,
@@ -49,6 +51,7 @@ class RifaDoradaApp extends StatelessWidget {
             }
             return null;
           } : null,
+          ),
         );
       },
     );

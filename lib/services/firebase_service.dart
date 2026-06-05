@@ -9,11 +9,22 @@ import '../models/participante.dart';
 import '../models/numero.dart';
 import '../models/app_config.dart';
 import '../config/constants.dart';
+import 'offline_queue_service.dart';
 
 Map<String, String> _botHeaders() => {
   'Content-Type': 'application/json',
   if (AppConstants.botApiKey.isNotEmpty) 'X-API-Key': AppConstants.botApiKey,
 };
+
+Future<http.Response> _botHttpPost(String endpoint, Map<String, dynamic> body) async {
+  final url = '${AppConstants.chatbotApi}$endpoint';
+  return OfflineQueueService().enqueueOrSend(
+    url: url,
+    method: 'POST',
+    headers: _botHeaders(),
+    body: body,
+  );
+}
 
 class FirebaseService {
   static FirebaseService? _instance;
@@ -974,11 +985,7 @@ class FirebaseService {
         };
       }).toList();
 
-      await http.post(
-        Uri.parse('${AppConstants.chatbotApi}/sync/rifas'),
-        headers: _botHeaders(),
-        body: jsonEncode({'rifas': rifasData}),
-      );
+      await _botHttpPost('/sync/rifas', {'rifas': rifasData});
     } catch (e) {
       debugPrint('[SYNC] Error enviando rifas al chatbot: $e');
     }
@@ -1006,11 +1013,7 @@ class FirebaseService {
         };
       }).toList();
 
-      await http.post(
-        Uri.parse('${AppConstants.chatbotApi}/sync/participantes'),
-        headers: _botHeaders(),
-        body: jsonEncode({'participantes': participantesData}),
-      );
+      await _botHttpPost('/sync/participantes', {'participantes': participantesData});
       debugPrint('[SYNC] Participantes de rifa $rifaId enviados al chatbot');
     } catch (e) {
       debugPrint('[SYNC] Error enviando participantes al chatbot: $e');
@@ -1060,34 +1063,21 @@ class FirebaseService {
         '🍀 *¡Mucha suerte!*',
       ].join('\n');
 
-      // Retry up to 3 times
-      int retries = 0;
-      while (retries < 3) {
-        try {
-          final response = await http.post(
-            Uri.parse('${AppConstants.chatbotApi}/send/wa'),
-            headers: _botHeaders(),
-            body: jsonEncode({
-              'number': participante.whatsappFormateado,
-              'message': mensajeTicket,
-              'organizacionId': participante.organizacionId ?? '',
-            }),
-          );
-          if (response.statusCode == 200) {
-            debugPrint('[SYNC] Ticket enviado al cliente por WhatsApp');
-            // Mark as notified
-            await _firestore!
-                .collection('participantes')
-                .doc(participante.id)
-                .update({'bot_notified': true});
-            break;
-          }
-          debugPrint('[SYNC] Chatbot respondió ${response.statusCode}, reintento ${retries + 1}');
-        } catch (e) {
-          debugPrint('[SYNC] Error en intento ${retries + 1}: $e');
+      final response = await _botHttpPost('/send/wa', {
+        'number': participante.whatsappFormateado,
+        'message': mensajeTicket,
+        'organizacionId': participante.organizacionId ?? '',
+      });
+      if (response.statusCode == 200 || response.statusCode == 202) {
+        debugPrint('[SYNC] Ticket encolado/enviado al cliente por WhatsApp');
+        if (response.statusCode == 200) {
+          await _firestore!
+              .collection('participantes')
+              .doc(participante.id)
+              .update({'bot_notified': true});
         }
-        retries++;
-        if (retries < 3) await Future.delayed(Duration(seconds: 1 << retries));
+      } else {
+        debugPrint('[SYNC] Chatbot respondió ${response.statusCode}');
       }
     } catch (e) {
       debugPrint('[SYNC] Error en _notifySaleToChatbot: $e');
@@ -1099,17 +1089,17 @@ class FirebaseService {
       final sizeKB = (imageBase64?.length ?? 0) / 1024;
       debugPrint('[SYNC] Enviando ticket con imagen a $whatsapp (base64: ${sizeKB.toStringAsFixed(1)} KB)');
 
-      final response = await http.post(
-        Uri.parse('${AppConstants.chatbotApi}/messages'),
-        headers: _botHeaders(),
-        body: jsonEncode({
-          'number': whatsapp,
-          'message': message,
-          'imageBase64': imageBase64,
-        }),
-      );
+      final response = await _botHttpPost('/messages', {
+        'number': whatsapp,
+        'message': message,
+        'imageBase64': imageBase64,
+      });
       if (response.statusCode == 200) {
         debugPrint('[SYNC] Ticket con imagen enviado al cliente');
+        return true;
+      }
+      if (response.statusCode == 202) {
+        debugPrint('[SYNC] Ticket con imagen encolado (sin conexión)');
         return true;
       }
       debugPrint('[SYNC] Error: chatbot respondió ${response.statusCode} - ${response.body}');
