@@ -40,12 +40,15 @@ class _StatsScreenState extends State<StatsScreen> {
       selectedRifa = null;
       provider.clearRifaSeleccionada();
       await _refreshGlobalStats(provider);
+      if (!mounted) return;
       if (auth.esAdmin) {
         setState(() => _loadingVendedor = true);
         final vStats = await provider.getVendedorStats();
         if (mounted) setState(() { _vendedorStats = vStats; _loadingVendedor = false; });
       }
+      if (!mounted) return;
       await _loadGlobalParticipants(provider);
+      if (!mounted) return;
       await _refreshGlobalPaymentStats(provider);
     } catch (e) {
       debugPrint('[STATS] Error loading data: $e');
@@ -58,12 +61,14 @@ class _StatsScreenState extends State<StatsScreen> {
   }
 
   Future<void> _refreshGlobalPaymentStats(RifaProvider provider) async {
+    if (!mounted) return;
     setState(() => _loadingPayment = true);
     final pStats = await provider.getPaymentMethodStatsGlobal();
     if (mounted) setState(() { _paymentMethodStats = pStats; _loadingPayment = false; });
   }
 
   Future<void> _loadPaymentStats(RifaProvider provider, String rifaId) async {
+    if (!mounted) return;
     setState(() => _loadingPayment = true);
     final pStats = await provider.getPaymentMethodStats(rifaId);
     if (mounted) setState(() { _paymentMethodStats = pStats; _loadingPayment = false; });
