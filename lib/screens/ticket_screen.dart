@@ -6,6 +6,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:screenshot/screenshot.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 import '../config/theme.dart';
 import '../config/constants.dart';
 import '../models/participante.dart';
@@ -406,7 +407,7 @@ class _TicketScreenState extends State<TicketScreen> {
                   const SizedBox(height: 24),
                   _buildDottedDivider(),
 
-                  // QR Simulado y Footer
+                  // QR Real y Footer
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -429,10 +430,45 @@ class _TicketScreenState extends State<TicketScreen> {
                           ),
                         ],
                       ),
-                      const Icon(
-                        Icons.qr_code_2_rounded,
-                        size: 60,
-                        color: Colors.white54,
+                      Column(
+                        children: [
+                          QrImageView(
+                            data: jsonEncode({
+                              'id': widget.participante.id.length > 6
+                                  ? widget.participante.id.substring(
+                                      widget.participante.id.length - 6)
+                                      .toUpperCase()
+                                  : widget.participante.id.toUpperCase(),
+                              'rifa': widget.rifa.nombre,
+                              'participante': widget.participante.nombre,
+                              'whatsapp': widget.participante.whatsapp,
+                              'numeros': widget.participante.numeros,
+                              'total': widget.participante.numeros.length *
+                                  widget.rifa.precioNumero,
+                              'fecha': DateTime.now().toIso8601String(),
+                            }),
+                            version: QrVersions.auto,
+                            size: 80,
+                            backgroundColor: Colors.white,
+                            padding: const EdgeInsets.all(6),
+                            eyeStyle: const QrEyeStyle(
+                              eyeShape: QrEyeShape.square,
+                              color: Colors.black,
+                            ),
+                            dataModuleStyle: const QrDataModuleStyle(
+                              dataModuleShape: QrDataModuleShape.square,
+                              color: Colors.black,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Escanea para verificar',
+                            style: TextStyle(
+                              fontSize: 9,
+                              color: AppTheme.textSecondary,
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
