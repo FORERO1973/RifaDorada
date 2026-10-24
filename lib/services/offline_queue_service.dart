@@ -66,9 +66,9 @@ class OfflineQueueService {
       if (response.statusCode >= 200 && response.statusCode < 500) {
         return response;
       }
-      return _queueIt(url, method, headers, body, maxRetries);
+      return await _queueIt(url, method, headers, body, maxRetries);
     } catch (_) {
-      return _queueIt(url, method, headers, body, maxRetries);
+      return await _queueIt(url, method, headers, body, maxRetries);
     }
   }
 
